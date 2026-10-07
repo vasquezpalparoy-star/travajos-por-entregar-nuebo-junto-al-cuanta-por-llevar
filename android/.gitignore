@@ -1,0 +1,7 @@
+build/
+local.properties
+*.p12
+*.jks
+*.keystore
+signing-password.txt
+app/src/main/assets/web/vendor/*.js

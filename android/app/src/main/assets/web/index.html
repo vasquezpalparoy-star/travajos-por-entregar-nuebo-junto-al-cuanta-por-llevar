@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Sistema de Control - Grafiplot</title>
+    
+    <!-- Tailwind CSS -->
+    <link rel="stylesheet" href="vendor/tailwind.css">
+    
+    <!-- html5-qrcode for barcode/QR scanning -->
+    <script src="vendor/scanner.js"></script>
+    
+    <!-- jsPDF and QRCode for PDF generation -->
+    <script src="vendor/jspdf.js"></script>
+    <script src="vendor/qrcode.js"></script>
+    <script src="vendor/barcode.js"></script>
+
+    <!-- SheetJS para exportar a Excel -->
+    <script src="vendor/xlsx.js"></script>
+
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f0fdfa; /* Teal muy claro */
+        }
+        
+        /* Custom scrollbar para contenedores internos */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        /* Scanner overrides con encuadre cuadrado 1:1 */
+        #reader { border: none !important; border-radius: 0.75rem; overflow: hidden; margin: 0 auto; width: 100% !important; height: 100% !important; background-color: #000; }
+        #reader video { object-fit: cover !important; width: 100% !important; height: 100% !important; }
+        #reader__dashboard_section_csr span { color: #374151 !important; }
+        #reader__dashboard_section_swaplink { text-decoration: none !important; color: #3b82f6 !important; }
+        #reader button {
+            background-color: #f59e0b !important;
+            color: white !important;
+            padding: 0.5rem 1rem !important;
+            border-radius: 0.375rem !important;
+            border: none !important;
+            font-weight: 500 !important;
+            cursor: pointer !important;
+            margin: 0.25rem !important;
+        }
+        #reader button:hover { background-color: #d97706 !important; }
+
+        /* Colores personalizados para paneles */
+        .panel-registro { background-color: #eff6ff; border-color: #bfdbfe; }
+        .panel-busqueda { background-color: #fdf4ff; border-color: #fbcfe8; }
+        .panel-herramientas { background-color: #fffbeb; border-color: #fde68a; }
+    </style>
+<link rel="stylesheet" href="mobile.css"></head>
+<body class="text-gray-800 min-h-screen w-screen flex flex-col p-2 gap-2 box-border overflow-x-hidden md:overflow-hidden md:h-screen">
+
+    <!-- Navegación Superior -->
+    <nav class="bg-gradient-to-r from-red-600 to-red-500 text-white p-3 rounded-xl shadow-md flex justify-between items-center shrink-0 h-14 md:h-16">
+        <div class="flex items-center gap-2 md:gap-3">
+            <img src="icon.png" alt="" class="brand-icon"><span class="text-xl md:text-2xl font-black tracking-widest text-white ml-1 md:ml-2 drop-shadow-md">GRAFIPLOT</span>
+            <h1 class="text-sm md:text-xl font-medium border-l-2 border-white/30 pl-2 md:pl-3 ml-1 md:ml-2">Trabajos y cuentas</h1>
+        </div>
+        <div class="flex items-center gap-2">
+            <div id="status-indicator" class="flex items-center gap-2 text-xs md:text-sm bg-white text-red-600 font-bold px-2.5 py-1 rounded-full shadow-inner">
+                <div class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" id="status-dot"></div>
+                <span id="status-text">Conectando...</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenedor Principal (Reordenado para Android: Búsqueda/Cámara arriba en móviles) -->
+    <main id="app-main" class="flex-1 overflow-y-auto md:overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-2 min-h-0">
+        
+        <!-- SECCIÓN 1 (ARRIBA EN MÓVIL): Búsqueda, Cámara y Escáner QR -->
+        <div id="work-panel" class="lg:col-span-7 xl:col-span-8 order-1 lg:order-2 panel-busqueda rounded-xl shadow-sm border p-3 md:p-4 flex flex-col min-h-0">
+            
+            <h2 class="text-sm md:text-base font-bold text-fuchsia-800 border-b border-fuchsia-200 pb-2 mb-2 md:mb-3 flex items-center justify-between shrink-0">
+                <span class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-fuchsia-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
+                    Escáner y Buscador QR
+                </span>
+                <span class="text-xs bg-fuchsia-100 text-fuchsia-700 px-2 py-0.5 rounded-full font-semibold">Mis trabajos</span>
+            </h2>
+            
+            <!-- Barra de búsqueda y botón de cámara -->
+            <div class="flex flex-col sm:flex-row gap-2 mb-2 md:mb-3 shrink-0">
+                <div class="flex-1 relative">
+                    <input type="text" id="search-input" placeholder="Buscar código, celular o cliente..." class="w-full pl-9 p-2.5 border-2 border-fuchsia-200 rounded-xl focus:ring-0 focus:border-fuchsia-500 outline-none transition-all text-sm font-semibold bg-white shadow-sm">
+                    <svg class="w-5 h-5 text-fuchsia-400 absolute left-2.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <button onclick="toggleScanner()" id="btn-scanner" class="bg-fuchsia-600 hover:bg-fuchsia-700 active:bg-fuchsia-800 text-white font-bold py-2.5 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 whitespace-nowrap shadow-md text-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
+                    <span id="scanner-btn-text">Abrir Cámara QR</span>
+                </button>
+            </div>
+
+            <!-- Contenedor del Escáner QR Cuadrado (Ubicado en la parte superior) -->
+            <div id="scanner-container" class="hidden w-full max-w-xs sm:max-w-sm mx-auto mb-3 bg-white border-2 border-fuchsia-300 rounded-2xl p-2.5 shrink-0 shadow-lg">
+                <div class="relative w-full aspect-square rounded-xl overflow-hidden bg-black shadow-inner border border-fuchsia-200 flex items-center justify-center">
+                    <div id="reader" class="w-full h-full"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <button onclick="refreshScanner()" class="bg-amber-100 hover:bg-amber-200 active:bg-amber-300 text-amber-900 font-bold py-2 px-2 rounded-xl transition-colors flex justify-center items-center gap-1 text-xs border border-amber-300 shadow-sm">
+                        🔄 Refrescar
+                    </button>
+                    <button onclick="toggleScanner()" class="bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-800 font-bold py-2 px-2 rounded-xl transition-colors flex justify-center items-center gap-1 text-xs border border-red-300 shadow-sm">
+                        ❌ Cerrar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Lista de Resultados de búsqueda -->
+            <div class="flex justify-between items-center mb-1 shrink-0">
+                <h3 class="text-xs font-bold text-fuchsia-700 uppercase tracking-wider">Registros (<span id="results-count">0</span>)</h3>
+            </div>
+            
+            <div id="results-container" class="flex-1 overflow-y-auto custom-scroll space-y-2 pr-1 min-h-[220px] max-h-[400px] md:max-h-none">
+                <div class="flex items-center justify-center h-full">
+                    <div class="text-center text-fuchsia-400 p-6 text-sm font-medium border-2 border-dashed border-fuchsia-200 rounded-xl bg-white/50">
+                        Los registros de trabajos aparecerán aquí.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- SECCIÓN 2: Registro de Datos y Herramientas -->
+        <div class="lg:col-span-5 xl:col-span-4 order-2 lg:order-1 flex flex-col gap-2 h-full min-h-0">
+            
+            <!-- Panel de Formulario -->
+            <div id="new-panel" class="panel-registro p-3 md:p-4 rounded-xl shadow-sm border flex-1 flex flex-col min-h-0">
+                <h2 class="text-sm md:text-base font-bold text-blue-800 border-b border-blue-200 pb-2 mb-2 md:mb-3 flex items-center justify-between shrink-0">
+                    <span class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        Registro de Trabajo
+                    </span>
+                    <span id="edit-badge" class="hidden text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full font-bold">Modo Edición</span>
+                </h2>
+                
+                <form id="register-form" class="flex flex-col gap-2 flex-1 overflow-y-auto custom-scroll pr-1">
+                    <div>
+                        <label class="block text-xs font-bold text-blue-900 mb-1">Nombre Completo del Cliente</label>
+                        <input type="text" id="reg-nombre" oninput="this.value = this.value.toUpperCase()" required class="w-full p-2.5 border-2 border-blue-200 rounded-xl focus:ring-0 focus:border-blue-500 outline-none transition-all text-sm font-semibold" placeholder="Ej. JUAN PÉREZ">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-blue-900 mb-1">Celular WhatsApp</label>
+                        <input type="tel" id="reg-celular" required class="w-full p-2.5 border-2 border-blue-200 rounded-xl focus:ring-0 focus:border-blue-500 outline-none transition-all text-sm font-semibold" placeholder="Ej. 952628844">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-blue-900 mb-1">Descripción del Trabajo</label>
+                        <textarea id="reg-descripcion" rows="2" class="w-full p-2.5 border-2 border-blue-200 rounded-xl focus:ring-0 focus:border-blue-500 outline-none transition-all text-sm custom-scroll font-medium" placeholder="Ej. Impresión de planos A1..."></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-bold text-blue-900 mb-1">Cant. Hojas</label>
+                            <input type="number" id="reg-hojas" min="1" value="1" required class="w-full p-2.5 border-2 border-blue-200 rounded-xl focus:ring-0 focus:border-blue-500 outline-none transition-all text-sm font-bold text-center" placeholder="1">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-blue-900 mb-1">Código QR Asignado</label>
+                            <select id="reg-codigo" required class="w-full p-2.5 border-2 border-blue-200 rounded-xl focus:ring-0 focus:border-blue-500 outline-none transition-all text-sm font-mono font-bold bg-white cursor-pointer">
+                                <option value="" disabled selected>Cargando...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-blue-900 mb-1">Ubicación en Estante</label>
+                        <select id="reg-ubicacion" required class="w-full p-2.5 border-2 border-blue-200 rounded-xl focus:ring-0 focus:border-blue-500 outline-none transition-all text-sm font-bold bg-white cursor-pointer">
+                            <option value="E1">Estante 1 (E1)</option>
+                            <option value="E2">Estante 2 (E2)</option>
+                            <option value="E3">Estante 3 (E3)</option>
+                            <option value="E4">Estante 4 (E4)</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 border-t-2 border-blue-100 pt-2 mt-1">
+                        <div>
+                            <label class="block text-[10px] font-bold text-blue-900 mb-1 leading-tight">Precio Total (S/)</label>
+                            <input type="number" id="reg-precio" step="0.10" required class="w-full p-2 border-2 border-blue-200 rounded-xl focus:ring-0 focus:border-blue-500 outline-none transition-all text-sm text-center font-bold" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="flex items-center gap-1 text-[10px] font-bold text-blue-900 mb-1 leading-tight cursor-pointer">
+                                <input type="checkbox" id="toggle-pago" class="w-3.5 h-3.5 cursor-pointer rounded">
+                                A Cuenta
+                            </label>
+                            <input type="number" id="reg-pago" step="0.10" disabled class="w-full p-2 border-2 border-gray-200 bg-gray-100 rounded-xl outline-none transition-all text-sm text-center font-bold" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-blue-900 mb-1 leading-tight">Cambio/Falta</label>
+                            <input type="text" id="reg-cambio" readonly class="w-full p-2 border-2 border-blue-200 rounded-xl bg-blue-50 outline-none transition-all text-sm text-center font-bold text-blue-800" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <div class="mt-auto pt-2 shrink-0">
+                        <button type="submit" id="btn-save-record" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-md text-sm">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                            Guardar Registro
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Panel de Herramientas -->
+            <div id="tools-panel" class="panel-herramientas p-2.5 rounded-xl shadow-sm border shrink-0">
+                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button onclick="exportToExcel()" class="w-full bg-green-100 hover:bg-green-200 active:bg-green-300 text-green-900 font-bold py-2 rounded-xl transition-colors flex justify-center items-center gap-1.5 border border-green-300 text-xs shadow-sm">
+                        📊 Exportar Excel
+                    </button>
+                    <button onclick="generateBarcodesPDF()" class="w-full bg-amber-100 hover:bg-amber-200 active:bg-amber-300 text-amber-900 font-bold py-2 rounded-xl transition-colors flex justify-center items-center gap-1.5 border border-amber-300 text-xs shadow-sm">
+                        📄 100 QR PDF
+                    </button>
+                    <button onclick="showClearModal()" class="w-full bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-800 font-bold py-2 rounded-xl transition-colors flex justify-center items-center gap-1.5 border border-red-300 text-xs shadow-sm">
+                        🗑️ Limpiar Todo
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main><nav class="bottom-nav" aria-label="Navegación principal">
+<button data-tab="work" class="active" onclick="mobileTab('work')"><span>▤</span>Trabajos</button>
+<button data-tab="new" onclick="mobileTab('new')"><span>＋</span>Registrar</button>
+<button data-tab="tools" onclick="mobileTab('tools')"><span>⚙</span>Herramientas</button></nav>
+
+    <!-- Modales de Confirmación y Resultados -->
+    
+    <!-- Modal Confirmar Limpieza -->
+    <div id="clear-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 transform scale-95 transition-transform" id="clear-modal-content">
+            <div class="flex items-center justify-center w-14 h-14 mx-auto bg-red-100 rounded-full mb-4">
+                <svg class="w-7 h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h3 class="text-xl font-black text-center text-gray-900 mb-2">¡Atención!</h3>
+            <p class="text-sm text-center text-gray-600 mb-6 font-medium">Vas a borrar TODAS las cuentas pendientes compartidas con el programa de PC. Esta acción no se puede deshacer.</p>
+            <div class="flex gap-3">
+                <button onclick="hideClearModal()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2.5 rounded-xl transition-colors text-sm">Cancelar</button>
+                <button onclick="executeClearData()" id="btn-confirm-clear" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-lg text-sm">
+                    Borrar Todo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Eliminar Un Solo Registro -->
+    <div id="delete-single-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 transform scale-95 transition-transform">
+            <div class="flex items-center justify-center w-14 h-14 mx-auto bg-red-100 rounded-full mb-4">
+                <svg class="w-7 h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </div>
+            <h3 class="text-xl font-black text-center text-gray-900 mb-2">Eliminar Registro</h3>
+            <p class="text-sm text-center text-gray-600 mb-6 font-medium">¿Estás seguro que deseas eliminar este registro de la base de datos?</p>
+            <input type="hidden" id="delete-id-input">
+            <div class="flex gap-3">
+                <button onclick="hideDeleteSingleModal()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2.5 rounded-xl transition-colors text-sm">Cancelar</button>
+                <button onclick="executeSingleDelete()" id="btn-confirm-single-delete" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-lg text-sm">
+                    Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ayuda Cámara -->
+    <div id="camera-error-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 transform scale-95 transition-transform">
+            <div class="flex items-center justify-center w-14 h-14 mx-auto bg-amber-100 rounded-full mb-4">
+                <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h3 class="text-xl font-black text-center text-gray-900 mb-2">Cámara Bloqueada</h3>
+            <p class="text-xs text-center text-gray-600 mb-4 font-medium">
+                Para usar la cámara en tu celular Android, debes abrir la página web desde un enlace seguro <b>HTTPS (GitHub Pages)</b>.
+            </p>
+            <button onclick="hideCameraErrorModal()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-xl transition-colors shadow-lg text-sm">Entendido</button>
+        </div>
+    </div>
+
+    <!-- Modal Resultado Escaneo / Código Libre -->
+    <div id="scan-result-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 transform scale-95 transition-transform relative" id="scan-result-content">
+            <!-- Contenido dinámico inyectado por JS -->
+        </div>
+    </div>
+
+    <!-- Contenedor Toast -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2"></div>
+
+    <!-- Canvas ocultos para PDFs -->
+    <canvas id="barcode-canvas" class="hidden"></canvas>
+
+    <div id="cloud-gate" class="fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3">
+            <img src="icon.png" class="login-icon" alt="Grafiplot"><h2 class="text-xl font-black text-slate-900">Bienvenido a Grafiplot</h2>
+            <p class="text-sm text-slate-600">Inicia sesión con la misma cuenta de Grafiplot que usas en tu PC.</p>
+            <form id="cloud-form" class="space-y-3">
+                <input id="cloud-url" aria-label="URL del proyecto Supabase" type="hidden" required placeholder="https://tu-proyecto.supabase.co" class="w-full border rounded-xl p-3 text-sm">
+                <input id="cloud-key" aria-label="Clave pública" type="hidden" required placeholder="Clave publishable / anon" class="w-full border rounded-xl p-3 text-sm">
+                <input id="cloud-email" aria-label="Correo" type="email" required placeholder="Correo" autocomplete="username" class="w-full border rounded-xl p-3 text-sm">
+                <input id="cloud-password" aria-label="Contraseña" type="password" required placeholder="Contraseña" autocomplete="current-password" class="w-full border rounded-xl p-3 text-sm">
+                <p id="cloud-message" class="text-sm text-red-600" role="alert"></p>
+                <button type="submit" class="w-full bg-red-600 text-white font-bold p-3 rounded-xl">Entrar y sincronizar</button>
+            </form>
+        </div>
+    </div>
+    <script src="vendor/supabase.js"></script>
+    <script src="config.js"></script><script src="mobile.js"></script><script type="module">
+        async function deliverPDF(doc, name, mode='save') {
+            if (window.Android) Android.exportFile(doc.output('datauristring').split(',')[1], name, 'application/pdf', mode);
+            else doc.save(name);
+        }
+        let api = null;
+        window.addEventListener('grafiplot-signout', async()=>{if(api){const {error}=await api.auth.signOut();if(error) showToast(error.message,'error');else location.reload();}});
+        let owner = null;
+        let records = [];
+        let html5QrcodeScanner = null;
+        let isScannerRunning = false;
+        let editingRecordId = null;
+        const TOTAL_CODES = 100;
+
+        const gate = document.getElementById('cloud-gate');
+        const cloudMessage = document.getElementById('cloud-message');
+        document.getElementById('cloud-url').value = window.GRAFIPLOT_CONFIG.url;
+        document.getElementById('cloud-key').value = window.GRAFIPLOT_CONFIG.key;
+
+        function calcularCambio() {
+            const precio = parseFloat(document.getElementById('reg-precio').value) || 0;
+            const pago = parseFloat(document.getElementById('reg-pago').value) || 0;
+            const cambio = pago - precio;
+            const inputCambio = document.getElementById('reg-cambio');
+            inputCambio.value = cambio < 0 ? 'Falta ' + Math.abs(cambio).toFixed(2) : cambio.toFixed(2);
+            inputCambio.classList.toggle('text-red-600', cambio < 0);
+        }
+
+        const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch =>
+            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+        function toRecord(row) {
+            return {
+                id: row.id, nombre: row.nombre || '', celular: row.telefono || '',
+                codigo: row.codigo || '', ubicacion: row.ubicacion || 'E1',
+                descripcion: row.descripcion || (row.items || []).map(i => i.name).join(', '),
+                hojas: Number(row.hojas) || 1, precio: Number(row.total) || 0,
+                pago: Number(row.pago) || 0, createdAt: row.guardado_en,
+                items: row.items || [], estado: row.estado
+            };
+        }
+
+        async function refreshRecords() {
+            if (!api || !owner) return;
+            const {data, error} = await api.from('pedidos_pendientes')
+                .select('id,nombre,telefono,items,total,estado,guardado_en,codigo,ubicacion,descripcion,hojas,pago')
+                .eq('user_id', owner.id).eq('estado', 'pendiente')
+                .order('guardado_en', {ascending:false}).limit(500);
+            if (error) { updateStatus('Error de datos', 'bg-red-500'); console.error(error); return; }
+            records = (data || []).map(toRecord);
+            updateStatus('Sincronizado', 'bg-green-500', 'text-green-700');
+            updateAvailableCodesSelect();
+            handleSearch();
+        }
+
+        async function initApp() {
+            updateAvailableCodesSelect();
+            if (!window.supabase?.createClient) {
+                cloudMessage.textContent = 'No se pudo cargar Supabase. Comprueba Internet.';
+                return;
+            }
+            const url = document.getElementById('cloud-url').value.trim();
+            const key = document.getElementById('cloud-key').value.trim();
+            if (!url || !key) { gate.classList.remove('hidden'); return; }
+            try {
+                api = window.supabase.createClient(url, key);
+                const {data:{session}, error} = await api.auth.getSession();
+                if (error) throw error;
+                owner = session?.user || null;
+                if (owner) { gate.classList.add('hidden'); await refreshRecords(); }
+                else gate.classList.remove('hidden');
+                api.auth.onAuthStateChange((_event, sessionNow) => {
+                    owner = sessionNow?.user || null;
+                    gate.classList.toggle('hidden', !!owner);
+                    if (owner) setTimeout(refreshRecords, 0); else { records = []; handleSearch(); }
+                });
+                setInterval(refreshRecords, 6000);
+                window.addEventListener('focus', refreshRecords);
+            } catch (error) {
+                console.error(error);
+                cloudMessage.textContent = 'No se pudo conectar. Revisa URL y clave pública.';
+                gate.classList.remove('hidden');
+            }
+        }
+
+        document.getElementById('cloud-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            cloudMessage.textContent = '';
+            const url = document.getElementById('cloud-url').value.trim();
+            const key = document.getElementById('cloud-key').value.trim();
+            try {
+                if (!url.startsWith('https://')) throw new Error('La URL debe comenzar con https://');
+                if (key.startsWith('sb_secret_')) throw new Error('Usa solamente la clave pública publishable / anon.');
+                try { if (JSON.parse(atob(key.split('.')[1])).role === 'service_role') throw new Error('La clave service_role no puede usarse en la app.'); } catch(e) { if(e.message.includes('service_role')) throw e; }
+                const changed = !api || url !== localStorage.getItem('grafiplot_supabase_url') || key !== localStorage.getItem('grafiplot_supabase_key');
+                if (changed) api = window.supabase.createClient(url, key);
+                const {data, error} = await api.auth.signInWithPassword({
+                    email:document.getElementById('cloud-email').value.trim(),
+                    password:document.getElementById('cloud-password').value
+                });
+                if (error) throw error;
+                owner = data.user;
+                localStorage.setItem('grafiplot_supabase_url', url);
+                localStorage.setItem('grafiplot_supabase_key', key);
+                document.getElementById('cloud-password').value = '';
+                gate.classList.add('hidden');
+                await refreshRecords();
+                // Reinitialize once after first configuration to attach session listeners.
+                if (changed) location.reload();
+            } catch (error) { cloudMessage.textContent = error.message || 'Error al iniciar sesión'; }
+        });
+
+        function updateAvailableCodesSelect() {
+            const selectEl = document.getElementById('reg-codigo');
+            if (!selectEl) return;
+
+            const currentSelected = selectEl.value;
+            const usedCodes = records.map(r => r.codigo);
+            
+            let editingCode = null;
+            if (editingRecordId) {
+                const rec = records.find(r => r.id === editingRecordId);
+                if (rec) editingCode = rec.codigo;
+            }
+
+            selectEl.innerHTML = '';
+            
+            let firstAvailable = null;
+            let availableCount = 0;
+
+            for (let i = 1; i <= TOTAL_CODES; i++) {
+                const codeStr = String(i).padStart(3, '0');
+                if (!usedCodes.includes(codeStr) || codeStr === editingCode) {
+                    availableCount++;
+                    const option = document.createElement('option');
+                    option.value = codeStr;
+                    option.textContent = `Código: ${codeStr}`;
+                    selectEl.appendChild(option);
+                    
+                    if (!firstAvailable) firstAvailable = codeStr;
+                }
+            }
+
+            if (availableCount === 0) {
+                const opt = document.createElement('option');
+                opt.value = "";
+                opt.textContent = "No hay códigos libres (1-100)";
+                opt.disabled = true;
+                selectEl.appendChild(opt);
+                selectEl.classList.add('bg-red-50', 'text-red-600');
+            } else {
+                selectEl.classList.remove('bg-red-50', 'text-red-600');
+                if (currentSelected && (!usedCodes.includes(currentSelected) || currentSelected === editingCode)) {
+                    selectEl.value = currentSelected;
+                } else if (firstAvailable) {
+                    selectEl.value = firstAvailable;
+                }
+            }
+        }
+
+        function updateStatus(text, bgClass, textClass = "text-gray-800") {
+            const el = document.getElementById('status-indicator');
+            if (!el) return;
+            document.getElementById('status-text').textContent = text;
+            document.getElementById('status-dot').className = `w-2 h-2 rounded-full ${bgClass} animate-pulse`;
+            el.className = `flex items-center gap-2 text-xs md:text-sm font-bold px-3 py-1.5 rounded-full shadow-inner ${textClass} bg-white`;
+        }
+
+        window.showToast = function(message, type = "success") {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            const bgColor = type === "success" ? "bg-green-600" : "bg-red-600";
+            toast.className = `${bgColor} text-white px-4 py-3 rounded-xl shadow-xl transform transition-all duration-300 -translate-y-10 opacity-0 flex items-center gap-3 font-bold text-xs md:text-sm`;
+            toast.innerHTML = `<span class="text-base">${type === 'success' ? '✓' : '⚠'}</span> ${message}`;
+            container.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.remove('-translate-y-10', 'opacity-0'));
+            setTimeout(() => {
+                toast.classList.add('-translate-y-10', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        };
+
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!owner || !api) {
+                showToast("Base de datos no disponible todavía", "error");
+                return;
+            }
+
+            const codeSelect = document.getElementById('reg-codigo');
+            if (!codeSelect.value) {
+                showToast("No hay códigos libres seleccionados", "error");
+                return;
+            }
+
+            const submitBtn = document.getElementById('btn-save-record');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Guardando...';
+
+            const precio = parseFloat(document.getElementById('reg-precio').value) || 0;
+            const descripcion = document.getElementById('reg-descripcion').value.trim();
+            const data = {
+                nombre: document.getElementById('reg-nombre').value.trim().toUpperCase(),
+                telefono: document.getElementById('reg-celular').value.trim(),
+                descripcion, hojas: parseInt(document.getElementById('reg-hojas').value,10) || 1,
+                codigo: codeSelect.value, ubicacion: document.getElementById('reg-ubicacion').value,
+                total: precio, pago: parseFloat(document.getElementById('reg-pago').value) || 0
+            };
+
+            try {
+                if (records.some(r => r.codigo === data.codigo && r.id !== editingRecordId)) {
+                    throw new Error('Este código ya está asignado. Actualiza la lista.');
+                }
+                let error;
+                if (editingRecordId) {
+                    const existing = records.find(r => r.id === editingRecordId);
+                    const baseItems = (existing?.items || []).filter(i => i.name !== 'Ajuste de precio');
+                    const baseTotal = baseItems.reduce((sum, item) => sum +
+                        (item.quantities || []).reduce((n, q) => n + (Number(q) || 0), 0) * (Number(item.price) || 0), 0);
+                    const difference = Math.round((precio - baseTotal) * 100) / 100;
+                    data.items = difference ? [...baseItems, {name:'Ajuste de precio',price:difference,quantities:['1'],isCustom:true}] : baseItems;
+                    ({error} = await api.from('pedidos_pendientes').update(data)
+                        .eq('id', editingRecordId).eq('user_id', owner.id));
+                    if (error) throw error;
+                    showToast(`Registro actualizado (${data.codigo})`);
+                    editingRecordId = null;
+                    document.getElementById('edit-badge').classList.add('hidden');
+                    submitBtn.classList.replace('bg-orange-600', 'bg-blue-600');
+                } else {
+                    ({error} = await api.from('pedidos_pendientes').insert({
+                        ...data, user_id:owner.id, estado:'pendiente',
+                        items:[{name:descripcion || 'Trabajo QR',price:precio,quantities:['1'],isCustom:true}]
+                    }));
+                    if (error) throw error;
+                    showToast(`Registrado con éxito (${data.codigo})`);
+                }
+                await refreshRecords();
+
+                // Limpiar formulario
+                document.getElementById('register-form').reset();
+                document.getElementById('reg-hojas').value = 1;
+                document.getElementById('toggle-pago').checked = false;
+                const inpPago = document.getElementById('reg-pago');
+                inpPago.disabled = true;
+                inpPago.value = '';
+                inpPago.classList.add('bg-gray-100', 'border-gray-200');
+                inpPago.classList.remove('border-blue-200', 'focus:ring-0', 'focus:border-blue-500');
+                calcularCambio();
+                updateAvailableCodesSelect();
+
+            } catch (error) {
+                console.error("Error guardando registro:", error);
+                showToast("Error al guardar el registro", "error");
+            } finally {
+                submitBtn.disabled = false;
+                if (!editingRecordId) {
+                    submitBtn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg> Guardar Registro`;
+                }
+            }
+        });
+
+        async function generatePureQRCode(canvas, text) {
+            if (typeof QRCode === 'undefined' || !QRCode.toCanvas) {
+                throw new Error("Librería QRCode no está disponible.");
+            }
+            return new Promise((resolve, reject) => {
+                QRCode.toCanvas(canvas, text, {
+                    errorCorrectionLevel: 'M',
+                    margin: 2,
+                    width: 320,
+                    color: { dark: '#000000', light: '#FFFFFF' }
+                }, function (error) {
+                    if (error) reject(error);
+                    else resolve();
+                });
+            });
+        }
+
+        window.editRecord = function(id) {
+            const record = records.find(r => r.id === id);
+            if (!record) return;
+
+            window.mobileTab?.('new');
+            editingRecordId = id;
+            document.getElementById('edit-badge').classList.remove('hidden');
+            document.getElementById('reg-nombre').value = record.nombre || '';
+            document.getElementById('reg-celular').value = record.celular || '';
+            document.getElementById('reg-descripcion').value = record.descripcion || '';
+            document.getElementById('reg-hojas').value = record.hojas || 1;
+            document.getElementById('reg-ubicacion').value = record.ubicacion || 'E1';
+            document.getElementById('reg-precio').value = record.precio || '';
+            
+            const inpPago = document.getElementById('reg-pago');
+            const chkToggle = document.getElementById('toggle-pago');
+            
+            if (record.pago !== undefined && record.pago !== null && record.pago !== '') {
+                chkToggle.checked = true;
+                inpPago.disabled = false;
+                inpPago.classList.remove('bg-gray-100', 'border-gray-200');
+                inpPago.classList.add('border-blue-200', 'focus:ring-0', 'focus:border-blue-500');
+                inpPago.value = record.pago;
+            } else {
+                chkToggle.checked = false;
+                inpPago.disabled = true;
+                inpPago.classList.add('bg-gray-100', 'border-gray-200');
+                inpPago.classList.remove('border-blue-200', 'focus:ring-0', 'focus:border-blue-500');
+                inpPago.value = '';
+            }
+
+            calcularCambio();
+            updateAvailableCodesSelect();
+            document.getElementById('reg-codigo').value = record.codigo;
+
+            const submitBtn = document.getElementById('btn-save-record');
+            submitBtn.innerHTML = `✏️ Actualizar Registro`;
+            submitBtn.classList.replace('bg-blue-600', 'bg-orange-600');
+            submitBtn.classList.replace('hover:bg-blue-700', 'hover:bg-orange-700');
+
+            document.querySelector('.panel-registro').scrollIntoView({ behavior: 'smooth' });
+            showToast("Modo edición activado", "success");
+        };
+
+        window.assignCodeToNewRecord = function(code) {
+            hideScanResultModal();
+            
+            let targetCode = code.trim();
+            if (!isNaN(targetCode) && targetCode.length > 0) {
+                targetCode = String(parseInt(targetCode, 10)).padStart(3, '0');
+            }
+
+            const codeSelect = document.getElementById('reg-codigo');
+            if (codeSelect) {
+                let optionExists = false;
+                for (let i = 0; i < codeSelect.options.length; i++) {
+                    if (codeSelect.options[i].value === targetCode) {
+                        optionExists = true;
+                        break;
+                    }
+                }
+                if (!optionExists) {
+                    const opt = document.createElement('option');
+                    opt.value = targetCode;
+                    opt.textContent = `Código: ${targetCode}`;
+                    codeSelect.appendChild(opt);
+                }
+                codeSelect.value = targetCode;
+            }
+
+            const regPanel = document.querySelector('.panel-registro');
+            if (regPanel) {
+                regPanel.scrollIntoView({ behavior: 'smooth' });
+            }
+            window.mobileTab?.('new');
+            const nameInput = document.getElementById('reg-nombre');
+            if (nameInput) {
+                setTimeout(() => nameInput.focus(), 300);
+            }
+
+            showToast(`Código ${targetCode} asignado al formulario`, "success");
+        };
+
+        window.confirmDeleteSingle = function(id) {
+            document.getElementById('delete-id-input').value = id;
+            document.getElementById('delete-single-modal').classList.remove('hidden');
+        };
+
+        window.hideDeleteSingleModal = () => document.getElementById('delete-single-modal').classList.add('hidden');
+        window.hideCameraErrorModal = () => document.getElementById('camera-error-modal').classList.add('hidden');
+
+        window.executeSingleDelete = async function() {
+            const id = document.getElementById('delete-id-input').value;
+            if (!id || !owner || !api) return;
+            
+            const btn = document.getElementById('btn-confirm-single-delete');
+            btn.disabled = true; btn.innerHTML = 'Eliminando...';
+            
+            try {
+                const {error} = await api.from('pedidos_pendientes').delete().eq('id',id).eq('user_id',owner.id);
+                if (error) throw error;
+                await refreshRecords();
+                showToast("Registro eliminado");
+                hideDeleteSingleModal();
+            } catch (error) {
+                showToast("Error al borrar", "error");
+            } finally {
+                btn.disabled = false; btn.innerHTML = 'Eliminar';
+            }
+        };
+
+        window.generateBarcodesPDF = async function() {
+            const btn = document.querySelector('button[onclick="generateBarcodesPDF()"]');
+            const originalHTML = btn ? btn.innerHTML : '';
+
+            try {
+                if (btn) btn.disabled = true;
+                showToast("Generando PDF con 100 QR... Por favor espera", "success");
+
+                if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+                    throw new Error("Librería jsPDF no está cargada.");
+                }
+                
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+                
+                let canvas = document.getElementById('barcode-canvas');
+                if (!canvas) {
+                    canvas = document.createElement('canvas');
+                    canvas.id = 'barcode-canvas';
+                    canvas.className = 'hidden';
+                    document.body.appendChild(canvas);
+                }
+                
+                const cols = 6;
+                const rows = 10;
+                const cellWidth = 33; 
+                const cellHeight = 28;
+                const startX = 6;
+                const startY = 10;
+                const qrSize = 22;
+
+                for (let i = 1; i <= 100; i++) {
+                    const code = String(i).padStart(3, '0');
+                    await generatePureQRCode(canvas, code);
+                    const imgData = canvas.toDataURL("image/jpeg", 0.95);
+
+                    const itemsPerPage = cols * rows;
+                    const itemOnPage = (i - 1) % itemsPerPage;
+                    const col = itemOnPage % cols;
+                    const row = Math.floor(itemOnPage / cols);
+
+                    if (i > 1 && itemOnPage === 0) doc.addPage();
+
+                    const x = startX + (col * cellWidth);
+                    const y = startY + (row * cellHeight);
+
+                    const offsetX = (cellWidth - qrSize) / 2;
+                    const offsetY = 1;
+                    
+                    doc.addImage(imgData, 'JPEG', x + offsetX, y + offsetY, qrSize, qrSize);
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(11);
+                    doc.setTextColor(0);
+                    doc.text(code, x + (cellWidth / 2), y + offsetY + qrSize + 3.5, { align: "center" });
+                    
+                    doc.setDrawColor(220);
+                    doc.setLineWidth(0.1);
+                    doc.rect(x, y, cellWidth, cellHeight);
+
+                    if (i % 15 === 0) {
+                        if (btn) btn.innerHTML = `⏳ (${i}/100)`;
+                        await new Promise(r => setTimeout(r, 10));
+                    }
+                }
+
+                await deliverPDF(doc, "Codigos_QR_Grafiplot_1_100.pdf");
+                showToast('PDF listo para guardar', 'success');
+
+            } catch (error) {
+                console.error("Error al generar PDF:", error);
+                showToast("Error: " + (error.message || "fallo al generar QR"), "error");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHTML;
+                }
+            }
+        };
+
+        window.generateReceiptPDF = async function(recordId, action = 'download') {
+            const record = records.find(r => r.id === recordId);
+            if (!record) return;
+
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
+                
+                doc.setFillColor(227, 24, 55); 
+                doc.rect(0, 0, 105, 18, 'F');
+
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(22);
+                doc.setTextColor(255, 255, 255);
+                doc.text("GRAFIPLOT", 52.5, 13, { align: "center" });
+
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(10);
+                doc.setTextColor(50);
+                doc.text("CONTROL DE ARCHIVOS", 10, 26);
+                doc.setFontSize(9);
+                doc.setFont("helvetica", "normal");
+                doc.text("Celular: 952 628 844", 10, 31);
+
+                doc.setDrawColor(200);
+                doc.line(10, 34, 95, 34);
+
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(12);
+                doc.setTextColor(0);
+                doc.text("TICKET DE REGISTRO", 10, 42);
+
+                const startY = 50;
+                const lineHeight = 6.5;
+                doc.setFontSize(10);
+                
+                doc.setFont("helvetica", "bold");
+                doc.text("CÓDIGO:", 10, startY);
+                doc.setFont("helvetica", "normal");
+                doc.text(record.codigo, 40, startY);
+
+                doc.setFont("helvetica", "bold");
+                doc.text("NOMBRE:", 10, startY + lineHeight);
+                doc.setFont("helvetica", "normal");
+                doc.text(record.nombre.substring(0, 25), 40, startY + lineHeight);
+
+                doc.setFont("helvetica", "bold");
+                doc.text("CELULAR:", 10, startY + (lineHeight*2));
+                doc.setFont("helvetica", "normal");
+                doc.text(record.celular, 40, startY + (lineHeight*2));
+
+                doc.setFont("helvetica", "bold");
+                doc.text("UBICACIÓN:", 10, startY + (lineHeight*3));
+                doc.setFont("helvetica", "normal");
+                doc.text(record.ubicacion, 40, startY + (lineHeight*3));
+
+                doc.setFont("helvetica", "bold");
+                doc.text("DESCRIP.:", 10, startY + (lineHeight*4));
+                doc.setFontSize(8);
+                doc.setFont("helvetica", "normal");
+                const descStr = (record.descripcion || 'Ninguna').substring(0, 40);
+                doc.text(descStr, 40, startY + (lineHeight*4));
+                doc.setFontSize(10);
+
+                doc.setFillColor(245, 245, 245);
+                doc.rect(10, startY + (lineHeight*5), 85, 22, 'F');
+
+                doc.setFont("helvetica", "bold");
+                doc.text("PRECIO TOTAL:", 12, startY + (lineHeight*6));
+                doc.text("S/ " + Number(record.precio || 0).toFixed(2), 65, startY + (lineHeight*6));
+
+                doc.text("A CUENTA:", 12, startY + (lineHeight*7));
+                doc.text("S/ " + Number(record.pago || 0).toFixed(2), 65, startY + (lineHeight*7));
+
+                const cambioCalc = (record.pago || 0) - (record.precio || 0);
+                if (cambioCalc < 0) {
+                    doc.setTextColor(200, 0, 0);
+                    doc.text("FALTA PAGAR:", 12, startY + (lineHeight*8));
+                    doc.text("S/ " + Math.abs(cambioCalc).toFixed(2), 65, startY + (lineHeight*8));
+                } else {
+                    doc.setTextColor(0, 100, 0);
+                    doc.text("CAMBIO:", 12, startY + (lineHeight*8));
+                    doc.text("S/ " + Math.abs(cambioCalc).toFixed(2), 65, startY + (lineHeight*8));
+                }
+
+                doc.setTextColor(100);
+                
+                let dateStr = "";
+                if(record.createdAt) {
+                    const d = new Date(record.createdAt);
+                    dateStr = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+                } else {
+                    dateStr = new Date().toLocaleDateString();
+                }
+                
+                doc.setFontSize(8);
+                doc.text("Fecha: " + dateStr, 10, startY + (lineHeight*9.5));
+
+                const canvasBC = document.getElementById('barcode-canvas');
+                await generatePureQRCode(canvasBC, record.codigo);
+                
+                const qrSize = 26;
+                const qrX = (105 - qrSize) / 2;
+                doc.addImage(canvasBC.toDataURL("image/jpeg"), 'JPEG', qrX, 110, qrSize, qrSize);
+                
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(8);
+                doc.setTextColor(100);
+                doc.text(`CÓDIGO: ${escapeHtml(record.codigo)}`, 52.5, 139, { align: "center" });
+
+                doc.setDrawColor(227, 24, 55);
+                doc.setLineWidth(0.5);
+                doc.rect(5, 5, 95, 138);
+
+                if (action === 'print') {
+                    if (window.Android) await deliverPDF(doc, `Recibo_Grafiplot_${record.codigo}.pdf`, 'print');
+                    else { doc.autoPrint(); window.open(doc.output('bloburl'), '_blank'); }
+                    showToast("Abriendo ticket...", "success");
+                } else {
+                    await deliverPDF(doc, `Recibo_Grafiplot_${record.codigo}.pdf`);
+                    showToast("Recibo listo para guardar.");
+                }
+            } catch (err) {
+                console.error("Error generando recibo", err);
+                showToast("Error al crear el recibo.", "error");
+            }
+        };
+
+        window.exportToExcel = function() {
+            try {
+                if (records.length === 0) {
+                    showToast("No hay datos para exportar", "error");
+                    return;
+                }
+
+                showToast("Generando Excel...", "success");
+
+                const dataParaExcel = records.map(r => {
+                    let fechaStr = "";
+                    if(r.createdAt) {
+                        const d = new Date(r.createdAt);
+                        fechaStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                    } else {
+                        fechaStr = "Desconocida";
+                    }
+
+                    const saldo = (r.pago || 0) - (r.precio || 0);
+                    const estadoDeuda = saldo < 0 ? "DEBE" : "CANCELADO / VUELTO";
+
+                    return {
+                        "Código": r.codigo,
+                        "Nombre Cliente": r.nombre,
+                        "Celular": r.celular,
+                        "Descripción del Trabajo": r.descripcion || "",
+                        "Cant. Hojas": r.hojas,
+                        "Ubicación": r.ubicacion,
+                        "Precio Total (S/)": Number(r.precio || 0).toFixed(2),
+                        "A Cuenta (S/)": Number(r.pago || 0).toFixed(2),
+                        "Saldo (S/)": Math.abs(saldo).toFixed(2),
+                        "Estado": estadoDeuda,
+                        "Fecha de Registro": fechaStr
+                    };
+                });
+
+                const ws = XLSX.utils.json_to_sheet(dataParaExcel);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Registros");
+
+                ws['!cols'] = [
+                    {wch: 10}, {wch: 30}, {wch: 15}, {wch: 50}, 
+                    {wch: 12}, {wch: 12}, {wch: 18}, {wch: 15}, 
+                    {wch: 15}, {wch: 22}, {wch: 20}
+                ];
+
+                const fechaHoy = new Date().toISOString().split('T')[0];
+                if (window.Android) Android.exportFile(XLSX.write(wb, {bookType:'xlsx', type:'base64'}), `Respaldo_Grafiplot_${fechaHoy}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'save');
+                else XLSX.writeFile(wb, `Respaldo_Grafiplot_${fechaHoy}.xlsx`);
+                showToast("Excel descargado correctamente", "success");
+
+            } catch (error) {
+                console.error("Error al exportar a Excel:", error);
+                showToast("Error al generar Excel", "error");
+            }
+        };
+
+        window.showClearModal = () => document.getElementById('clear-modal').classList.remove('hidden');
+        window.hideClearModal = () => document.getElementById('clear-modal').classList.add('hidden');
+        
+        window.showScanResultModal = function(decodedText) {
+            const rawText = (decodedText || '').trim();
+            
+            let record = records.find(r => r.codigo && (r.codigo === rawText || r.codigo.toLowerCase() === rawText.toLowerCase()));
+            
+            if (!record && !isNaN(rawText) && rawText.length > 0) {
+                const padded = String(parseInt(rawText, 10)).padStart(3, '0');
+                record = records.find(r => r.codigo === padded);
+            }
+
+            const contentDiv = document.getElementById('scan-result-content');
+            if (!contentDiv) return;
+
+            if (record) {
+                const cleanPhone = record.celular ? record.celular.replace(/\D/g, '') : '';
+                const waNumber = (cleanPhone.length === 9 && cleanPhone.startsWith('9')) ? '51' + cleanPhone : cleanPhone;
+                const waLink = waNumber ? `https://wa.me/${waNumber}` : '#';
+
+                contentDiv.innerHTML = `
+                    <div class="absolute top-0 left-0 w-full h-2 bg-green-500 rounded-t-2xl"></div>
+                    <div class="flex justify-between items-start mb-4 mt-1">
+                        <div>
+                            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Código Leído</h3>
+                            <div class="text-3xl font-black text-gray-800 font-mono">${escapeHtml(record.codigo)}</div>
+                        </div>
+                        <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-xl font-black text-sm border border-blue-200">
+                            ${escapeHtml(record.ubicacion)}
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 rounded-xl p-3 border border-gray-100 space-y-2 mb-4 text-xs">
+                        <div>
+                            <div class="text-[10px] font-bold text-gray-500 uppercase">Cliente</div>
+                            <div class="font-bold text-gray-900 text-sm">${escapeHtml(record.nombre)}</div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <div class="text-[10px] font-bold text-gray-500 uppercase">Celular</div>
+                                <div class="font-medium text-gray-800">📱 ${escapeHtml(record.celular)}</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-bold text-gray-500 uppercase">Hojas</div>
+                                <div class="font-medium text-gray-800">📄 ${record.hojas} h.</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-bold text-gray-500 uppercase">Descripción</div>
+                            <div class="text-gray-700 italic border-l-2 border-gray-300 pl-2 mt-0.5 break-words">${escapeHtml(record.descripcion || 'Sin descripción')}</div>
+                        </div>
+                        <div class="border-t border-gray-200 pt-2 mt-2 flex justify-between items-center">
+                            <div class="font-black text-gray-800">Total: S/ ${Number(record.precio || 0).toFixed(2)}</div>
+                            <div class="font-black text-xs ${(record.pago - record.precio) < 0 ? 'text-red-600 bg-red-100' : 'text-green-600 bg-green-100'} px-2 py-0.5 rounded">
+                                ${(record.pago - record.precio) < 0 ? 'Falta: S/ ' + Math.abs(record.pago - record.precio).toFixed(2) : 'A Cuenta: S/ ' + Number(record.pago || 0).toFixed(2)}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <a href="${waLink}" target="_blank" class="${!waNumber ? 'pointer-events-none opacity-50' : ''} w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md text-xs flex justify-center items-center gap-1">
+                            💬 Contactar
+                        </a>
+                        <button onclick="generateReceiptPDF('${record.id}', 'print')" class="w-full bg-teal-100 hover:bg-teal-200 text-teal-800 font-bold py-2.5 rounded-xl transition-colors text-xs flex justify-center items-center gap-1">
+                            🖨️ Imprimir
+                        </button>
+                        <button onclick="generateReceiptPDF('${record.id}', 'download')" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-2.5 rounded-xl transition-colors text-xs flex justify-center items-center gap-1">
+                            📄 PDF
+                        </button>
+                        <button onclick="hideScanResultModal()" class="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md text-xs">
+                            Aceptar
+                        </button>
+                    </div>
+                `;
+            } else {
+                contentDiv.innerHTML = `
+                    <div class="absolute top-0 left-0 w-full h-2 bg-amber-500 rounded-t-2xl"></div>
+                    <div class="text-center pt-2">
+                        <div class="flex items-center justify-center w-14 h-14 mx-auto bg-amber-100 rounded-full mb-3">
+                            <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        </div>
+                        <h3 class="text-lg font-black text-gray-900 mb-1">Código No Registrado</h3>
+                        <p class="text-xs text-gray-600 mb-4 font-medium">El código <strong class="font-mono text-blue-700 text-sm bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${escapeHtml(rawText)}</strong> está libre y no tiene ningún cliente asignado.</p>
+                        <div class="flex flex-col gap-2">
+                            <button onclick="assignCodeToNewRecord('${/^\d{1,3}$/.test(rawText) ? rawText : ''}')" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3 rounded-xl transition-colors shadow-md text-xs flex justify-center items-center gap-2">
+                                ➕ Asignar a Nuevo Registro
+                            </button>
+                            <button onclick="hideScanResultModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2.5 rounded-xl transition-colors text-xs">
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+            document.getElementById('scan-result-modal').classList.remove('hidden');
+        };
+
+        window.hideScanResultModal = () => document.getElementById('scan-result-modal').classList.add('hidden');
+
+        window.executeClearData = async function() {
+            if (!owner || !api) return;
+            const btn = document.getElementById('btn-confirm-clear');
+            btn.disabled = true; btn.innerHTML = 'Borrando...';
+            try {
+                const {error} = await api.from('pedidos_pendientes').delete().eq('user_id',owner.id).eq('estado','pendiente');
+                if (error) throw error;
+                await refreshRecords();
+                showToast("Sistema reiniciado.");
+                hideClearModal();
+                document.getElementById('search-input').value = '';
+            } catch (error) {
+                showToast("Error al borrar", "error");
+            } finally {
+                btn.disabled = false; btn.innerHTML = 'Borrar Todo';
+            }
+        };
+
+        window.handleSearch = function() {
+            const query = (document.getElementById('search-input')?.value || '').trim().toLowerCase();
+            const container = document.getElementById('results-container');
+            const countEl = document.getElementById('results-count');
+
+            if (!container) return;
+
+            const filtered = records.filter(r => {
+                const code = (r.codigo || '').toLowerCase();
+                const name = (r.nombre || '').toLowerCase();
+                const phone = (r.celular || '').toLowerCase();
+                return code.includes(query) || name.includes(query) || phone.includes(query);
+            });
+
+            if (countEl) countEl.textContent = filtered.length;
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="flex items-center justify-center h-full min-h-[150px]">
+                        <div class="text-center text-fuchsia-400 p-6 text-xs font-medium border-2 border-dashed border-fuchsia-200 rounded-xl bg-white/50">
+                            No se encontraron registros.
+                        </div>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(r => {
+                const precio = Number(r.precio || 0);
+                const pago = Number(r.pago || 0);
+                const saldo = pago - precio;
+                const falta = saldo < 0;
+
+                return `
+                    <div class="bg-white p-3 rounded-xl border border-fuchsia-100 shadow-sm hover:shadow-md transition-shadow flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div class="flex items-center gap-3">
+                            <span class="bg-fuchsia-600 text-white font-mono font-bold text-xs px-2.5 py-1 rounded-lg shrink-0">
+                                ${escapeHtml(r.codigo)}
+                            </span>
+                            <div>
+                                <h4 class="font-bold text-gray-900 text-xs leading-snug">${escapeHtml(r.nombre)}</h4>
+                                <div class="text-[11px] text-gray-500 flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                                    <span>📱 ${escapeHtml(r.celular)}</span>
+                                    <span>📄 ${r.hojas} h.</span>
+                                    <span class="font-bold text-fuchsia-700">📍 ${escapeHtml(r.ubicacion)}</span>
+                                </div>
+                                ${r.descripcion ? `<p class="text-[11px] text-gray-600 italic mt-0.5 truncate max-w-xs">${escapeHtml(r.descripcion)}</p>` : ''}
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-100">
+                            <div class="text-right">
+                                <div class="font-bold text-[11px] text-gray-500">Total: S/ ${precio.toFixed(2)}</div>
+                                <div class="font-black text-xs ${falta ? 'text-red-600' : 'text-green-600'}">
+                                    ${falta ? 'Falta: S/ ' + Math.abs(saldo).toFixed(2) : 'A Cuenta: S/ ' + pago.toFixed(2)}
+                                </div>
+                            </div>
+                            <div class="flex gap-1">
+                                <button onclick="editRecord('${r.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 p-2 rounded-lg transition-colors text-xs font-bold" title="Editar">
+                                    ✏️
+                                </button>
+                                <button onclick="generateReceiptPDF('${r.id}', 'download')" class="bg-purple-100 hover:bg-purple-200 text-purple-700 p-2 rounded-lg transition-colors text-xs font-bold" title="PDF">
+                                    📄
+                                </button>
+                                <button onclick="confirmDeleteSingle('${r.id}')" class="bg-red-100 hover:bg-red-200 text-red-700 p-2 rounded-lg transition-colors text-xs font-bold" title="Eliminar">
+                                    🗑️
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        window.startScannerInstance = function() {
+            const container = document.getElementById('scanner-container');
+            const btnText = document.getElementById('scanner-btn-text');
+
+            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                document.getElementById('camera-error-modal').classList.remove('hidden');
+            }
+
+            container.classList.remove('hidden');
+            if (btnText) btnText.textContent = "Iniciando...";
+
+            html5QrcodeScanner = new Html5Qrcode("reader");
+
+            const config = {
+                fps: 15,
+                aspectRatio: 1.0,
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                    const size = Math.floor(minEdge * 0.85);
+                    return { width: size, height: size };
+                },
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                }
+            };
+
+            html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                config,
+                (decodedText) => {
+                    try {
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        const osc = ctx.createOscillator();
+                        osc.type = "sine";
+                        osc.frequency.setValueAtTime(800, ctx.currentTime);
+                        osc.connect(ctx.destination);
+                        osc.start();
+                        osc.stop(ctx.currentTime + 0.1);
+                    } catch (e) {}
+
+                    showScanResultModal(decodedText);
+                    toggleScanner();
+                },
+                () => {}
+            ).then(() => {
+                isScannerRunning = true;
+                if (btnText) btnText.textContent = "Cerrar Cámara";
+            }).catch((err) => {
+                console.error("Error iniciando cámara:", err);
+                showToast("No se pudo iniciar la cámara.", "error");
+                container.classList.add('hidden');
+                if (btnText) btnText.textContent = "Abrir Cámara QR";
+                isScannerRunning = false;
+            });
+        };
+
+        window.refreshScanner = async function() {
+            showToast("Refrescando cámara...", "success");
+            if (isScannerRunning && html5QrcodeScanner) {
+                try {
+                    await html5QrcodeScanner.stop();
+                    html5QrcodeScanner.clear();
+                } catch (err) {
+                    console.warn("Error al detener cámara previo a refresco:", err);
+                }
+                isScannerRunning = false;
+            }
+            startScannerInstance();
+        };
+
+        window.toggleScanner = function() {
+            const container = document.getElementById('scanner-container');
+            const btnText = document.getElementById('scanner-btn-text');
+
+            if (isScannerRunning) {
+                if (html5QrcodeScanner) {
+                    html5QrcodeScanner.stop().then(() => {
+                        html5QrcodeScanner.clear();
+                        isScannerRunning = false;
+                        container.classList.add('hidden');
+                        if (btnText) btnText.textContent = "Abrir Cámara QR";
+                    }).catch(err => {
+                        console.error("Error al detener cámara:", err);
+                        container.classList.add('hidden');
+                        isScannerRunning = false;
+                        if (btnText) btnText.textContent = "Abrir Cámara QR";
+                    });
+                } else {
+                    container.classList.add('hidden');
+                    isScannerRunning = false;
+                    if (btnText) btnText.textContent = "Abrir Cámara QR";
+                }
+            } else {
+                startScannerInstance();
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            
+            const inpPrecio = document.getElementById('reg-precio');
+            const inpPago = document.getElementById('reg-pago');
+            const chkTogglePago = document.getElementById('toggle-pago');
+            const searchInput = document.getElementById('search-input');
+
+            if (inpPrecio) inpPrecio.addEventListener('input', calcularCambio);
+            if (inpPago) inpPago.addEventListener('input', calcularCambio);
+            
+            if (chkTogglePago) {
+                chkTogglePago.addEventListener('change', function() {
+                    if (this.checked) {
+                        inpPago.disabled = false;
+                        inpPago.classList.remove('bg-gray-100', 'border-gray-200');
+                        inpPago.classList.add('border-blue-200', 'focus:ring-0', 'focus:border-blue-500');
+                        inpPago.focus();
+                    } else {
+                        inpPago.disabled = true;
+                        inpPago.value = '';
+                        inpPago.classList.add('bg-gray-100', 'border-gray-200');
+                        inpPago.classList.remove('border-blue-200', 'focus:ring-0', 'focus:border-blue-500');
+                    }
+                    calcularCambio();
+                });
+            }
+
+            if (searchInput) {
+                searchInput.addEventListener('input', handleSearch);
+                searchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const query = (e.target.value || '').trim();
+                        if (query) showScanResultModal(query);
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
