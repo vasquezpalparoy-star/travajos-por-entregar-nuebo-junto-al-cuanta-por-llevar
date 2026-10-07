@@ -2,6 +2,8 @@
 
 Aplicación instalable para Android 8.0 o posterior. Conserva las funciones del index.html del repositorio: registro y edición de trabajos, pagos y saldo, búsqueda por cliente/celular/código, escáner QR, contacto por WhatsApp, tickets PDF e impresión, Excel, 100 etiquetas QR y eliminación con confirmación.
 
+En la versión 1.1 la cámara QR se inicia automáticamente después de recuperar la sesión y cargar los registros, y al volver a la aplicación. Se detiene al salir de la app, cambiar de sección, cerrar sesión o leer un QR. Android solicita el permiso de cámara la primera vez.
+
 La conexión al proyecto CUENTAS ya está incluida. El usuario solo introduce su correo y contraseña de Grafiplot; la sesión se conserva en el almacenamiento privado de la aplicación. Necesita Internet para consultar y modificar datos de Supabase. Bibliotecas, estilos e iconos vienen incluidos en la APK.
 
 ## Compilación

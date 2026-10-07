@@ -61,7 +61,7 @@ public class MainActivity extends Activity {
         },null);
     }
     @Override public void onBackPressed(){web.evaluateJavascript("window.androidBack ? androidBack() : false",value->{if(!"true".equals(value))new AlertDialog.Builder(this).setMessage("¿Salir de Grafiplot?").setPositiveButton("Salir",(d,w)->finish()).setNegativeButton("Continuar",null).show();});}
-    @Override protected void onPause(){web.evaluateJavascript("if(window.toggleScanner && document.getElementById('scanner-btn-text')?.textContent==='Cerrar Cámara') toggleScanner()",null);web.onPause();super.onPause();}
-    @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();}
+    @Override protected void onPause(){web.evaluateJavascript("window.dispatchEvent(new Event('grafiplot-pause'))",null);web.onPause();super.onPause();}
+    @Override protected void onResume(){super.onResume();if(web!=null){web.onResume();web.evaluateJavascript("window.dispatchEvent(new Event('grafiplot-resume'))",null);}}
     @Override protected void onDestroy(){if(camera!=null)camera.deny();if(web!=null){web.removeJavascriptInterface("Android");web.destroy();}super.onDestroy();}
 }

@@ -374,12 +374,12 @@
                 const {data:{session}, error} = await api.auth.getSession();
                 if (error) throw error;
                 owner = session?.user || null;
-                if (owner) { gate.classList.add('hidden'); await refreshRecords(); }
+                if (owner) { gate.classList.add('hidden'); await refreshRecords(); window.dispatchEvent(new Event('grafiplot-ready')); }
                 else gate.classList.remove('hidden');
                 api.auth.onAuthStateChange((_event, sessionNow) => {
                     owner = sessionNow?.user || null;
                     gate.classList.toggle('hidden', !!owner);
-                    if (owner) setTimeout(refreshRecords, 0); else { records = []; handleSearch(); }
+                    if (owner) setTimeout(async()=>{await refreshRecords(); window.dispatchEvent(new Event('grafiplot-ready'));}, 0); else { window.grafiplotReady=false; window.setScannerActive(false); records = []; handleSearch(); }
                 });
                 setInterval(refreshRecords, 6000);
                 window.addEventListener('focus', refreshRecords);
@@ -1150,101 +1150,64 @@
             }).join('');
         };
 
-        window.startScannerInstance = function() {
+        let scannerWanted = false;
+        let scannerTask = null;
+        window.setScannerActive = function(active) {
+            scannerWanted = !!active;
+            if (scannerTask) return scannerTask;
             const container = document.getElementById('scanner-container');
             const btnText = document.getElementById('scanner-btn-text');
-
-            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-                document.getElementById('camera-error-modal').classList.remove('hidden');
-            }
-
-            container.classList.remove('hidden');
-            if (btnText) btnText.textContent = "Iniciando...";
-
-            html5QrcodeScanner = new Html5Qrcode("reader");
-
-            const config = {
-                fps: 15,
-                aspectRatio: 1.0,
-                qrbox: (viewfinderWidth, viewfinderHeight) => {
-                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                    const size = Math.floor(minEdge * 0.85);
-                    return { width: size, height: size };
-                },
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
+            scannerTask = Promise.resolve().then(async () => {
+                while (scannerWanted !== isScannerRunning) {
+                    if (scannerWanted) {
+                        container.classList.remove('hidden');
+                        btnText.textContent = 'Iniciando...';
+                        html5QrcodeScanner = new Html5Qrcode('reader');
+                        try {
+                            await html5QrcodeScanner.start({facingMode:'environment'}, {
+                                fps:15, aspectRatio:1.0,
+                                qrbox:(width,height)=>{const size=Math.floor(Math.min(width,height)*0.85);return {width:size,height:size};},
+                                experimentalFeatures:{useBarCodeDetectorIfSupported:true}
+                            }, decodedText => {
+                                if (!scannerWanted) return;
+                                window.setScannerActive(false);
+                                try {
+                                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                                    const osc = ctx.createOscillator();
+                                    osc.frequency.setValueAtTime(800,ctx.currentTime);
+                                    osc.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+0.1);
+                                    osc.onended=()=>ctx.close();
+                                } catch(e) {}
+                                showScanResultModal(decodedText);
+                            }, ()=>{});
+                            isScannerRunning = true;
+                            btnText.textContent = 'Cerrar Cámara';
+                        } catch(error) {
+                            scannerWanted = false;
+                            isScannerRunning = false;
+                            try { html5QrcodeScanner.clear(); } catch(e) {}
+                            html5QrcodeScanner = null;
+                            container.classList.add('hidden');
+                            btnText.textContent = 'Abrir Cámara QR';
+                            showToast('No se pudo abrir la cámara. Revisa el permiso de cámara.', 'error');
+                        }
+                    } else {
+                        try { await html5QrcodeScanner.stop(); html5QrcodeScanner.clear(); }
+                        catch(error) { console.warn('Error al detener cámara:',error); }
+                        isScannerRunning = false;
+                        html5QrcodeScanner = null;
+                        container.classList.add('hidden');
+                        btnText.textContent = 'Abrir Cámara QR';
+                    }
                 }
-            };
-
-            html5QrcodeScanner.start(
-                { facingMode: "environment" },
-                config,
-                (decodedText) => {
-                    try {
-                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                        const osc = ctx.createOscillator();
-                        osc.type = "sine";
-                        osc.frequency.setValueAtTime(800, ctx.currentTime);
-                        osc.connect(ctx.destination);
-                        osc.start();
-                        osc.stop(ctx.currentTime + 0.1);
-                    } catch (e) {}
-
-                    showScanResultModal(decodedText);
-                    toggleScanner();
-                },
-                () => {}
-            ).then(() => {
-                isScannerRunning = true;
-                if (btnText) btnText.textContent = "Cerrar Cámara";
-            }).catch((err) => {
-                console.error("Error iniciando cámara:", err);
-                showToast("No se pudo iniciar la cámara.", "error");
-                container.classList.add('hidden');
-                if (btnText) btnText.textContent = "Abrir Cámara QR";
-                isScannerRunning = false;
-            });
+            }).finally(()=>{scannerTask=null;});
+            return scannerTask;
         };
-
+        window.startScannerInstance = () => window.setScannerActive(true);
+        window.toggleScanner = () => window.setScannerActive(!scannerWanted);
         window.refreshScanner = async function() {
-            showToast("Refrescando cámara...", "success");
-            if (isScannerRunning && html5QrcodeScanner) {
-                try {
-                    await html5QrcodeScanner.stop();
-                    html5QrcodeScanner.clear();
-                } catch (err) {
-                    console.warn("Error al detener cámara previo a refresco:", err);
-                }
-                isScannerRunning = false;
-            }
-            startScannerInstance();
-        };
-
-        window.toggleScanner = function() {
-            const container = document.getElementById('scanner-container');
-            const btnText = document.getElementById('scanner-btn-text');
-
-            if (isScannerRunning) {
-                if (html5QrcodeScanner) {
-                    html5QrcodeScanner.stop().then(() => {
-                        html5QrcodeScanner.clear();
-                        isScannerRunning = false;
-                        container.classList.add('hidden');
-                        if (btnText) btnText.textContent = "Abrir Cámara QR";
-                    }).catch(err => {
-                        console.error("Error al detener cámara:", err);
-                        container.classList.add('hidden');
-                        isScannerRunning = false;
-                        if (btnText) btnText.textContent = "Abrir Cámara QR";
-                    });
-                } else {
-                    container.classList.add('hidden');
-                    isScannerRunning = false;
-                    if (btnText) btnText.textContent = "Abrir Cámara QR";
-                }
-            } else {
-                startScannerInstance();
-            }
+            await window.setScannerActive(false);
+            await window.setScannerActive(true);
         };
 
         window.addEventListener('DOMContentLoaded', () => {
