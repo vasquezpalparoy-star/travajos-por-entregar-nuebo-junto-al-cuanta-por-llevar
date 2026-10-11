@@ -35,3 +35,11 @@ test('fallo al consultar nube mantiene evento pendiente sin ack',async()=>{
  const stop=startWifiReceiver({fetcher:async path=>{requests.push(path);return {ok:true,json:async()=>({pendientes:1,events:[{evento:'e',codigo:'001'}]})}},canRead:()=>true,isModalOpen:()=>false,show:async()=>{throw new Error('offline')},status:s=>error=s,schedule:fn=>next=fn});
  await new Promise(setImmediate);assert.equal(error,'offline');assert.deepEqual(requests,['/events']);stop();
 });
+test('cerrar ventana Windows confirma lectura y despierta sin depender del temporizador',async()=>{
+ let next,wake,open=false,delivered=false,closed=false,unsubscribed=false;const requests=[];
+ const fetcher=async(path)=>{requests.push(path);return {ok:true,json:async()=>path==='/events'?{pendientes:delivered?0:1,events:delivered?[]:[{evento:'native',codigo:'003'}]}:path==='/popup-state'?{closed,evento:'native'}:(delivered=true,{ok:true})}};
+ const stop=startWifiReceiver({fetcher,canRead:()=>true,isModalOpen:()=>open,show:async(code,event)=>{assert.equal(event,'native');open=true;},closeModal:()=>open=false,status:()=>{},schedule:fn=>next=fn,subscribe:fn=>{wake=fn;return ()=>unsubscribed=true}});
+ await new Promise(setImmediate);await wake();assert.equal(requests.includes('/ack'),false);
+ closed=true;await wake();assert.equal(open,false);assert.equal(requests.filter(x=>x==='/ack').length,1);
+ stop();assert.equal(unsubscribed,true);
+});

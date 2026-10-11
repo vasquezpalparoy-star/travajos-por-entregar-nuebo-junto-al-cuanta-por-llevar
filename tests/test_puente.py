@@ -2,6 +2,7 @@ import sys, tempfile, threading, unittest, json, urllib.request, urllib.error
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'lector-wifi'))
 from puente import Lecturas, Puente
+from ventana import Ventana
 class BridgeTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.data=Lecturas(self.tmp.name);self.server=Puente(self.data,host='127.0.0.1',port=0)
@@ -41,4 +42,32 @@ class BridgeTests(unittest.TestCase):
   self.request('/scan',{'evento':'e','codigo':'001'})
   with self.assertRaises(urllib.error.HTTPError) as e:self.request('/scan',{'evento':'e','codigo':'002'})
   self.assertEqual(e.exception.code,400)
+ def test_desktop_result_requires_browser_and_pending_event(self):
+  popup=Ventana();self.server.popup=popup
+  try:
+   self.request('/scan',{'evento':'desktop','codigo':'001'})
+   with self.assertRaises(urllib.error.HTTPError) as e:self.request('/popup',{'evento':'desktop','text':'Cliente'})
+   self.assertEqual(e.exception.code,403)
+   self.request('/popup',{'evento':'desktop','text':'Cliente: Ana\nDebe S/ 15.00'},browser=True)
+   self.assertEqual(json.loads(popup.path.read_text())['text'],'Cliente: Ana\nDebe S/ 15.00')
+   self.assertFalse(json.loads(self.request('/popup-state',browser=True)[1])['closed'])
+   popup.closed_path.write_text('otro-evento')
+   self.assertFalse(json.loads(self.request('/popup-state',browser=True)[1])['closed'])
+   popup.closed_path.write_text('desktop')
+   self.assertTrue(json.loads(self.request('/popup-state',browser=True)[1])['closed'])
+   self.request('/ack',{'evento':'desktop'},browser=True)
+   self.assertFalse(json.loads(popup.path.read_text())['visible'])
+   with self.assertRaises(urllib.error.HTTPError) as e:self.request('/popup',{'evento':'desktop','text':'Viejo'},browser=True)
+   self.assertEqual(e.exception.code,400)
+  finally:popup.close();self.server.popup=None
+ def test_live_stream_is_browser_only_and_wakes(self):
+  with self.assertRaises(urllib.error.HTTPError) as e:self.request('/live')
+  self.assertEqual(e.exception.code,403)
+  req=urllib.request.Request(self.url+'/live',headers={'Cookie':'grafiplot_bridge='+self.server.browser_token})
+  with urllib.request.urlopen(req,timeout=4) as response:
+   self.assertEqual(response.headers['Content-Type'],'text/event-stream')
+   self.assertEqual(response.readline(),b'data: wake\n')
+   self.assertEqual(response.readline(),b'\n')
+   self.request('/scan',{'evento':'live','codigo':'002'})
+   self.assertEqual(response.readline(),b'data: wake\n')
 if __name__=='__main__':unittest.main()

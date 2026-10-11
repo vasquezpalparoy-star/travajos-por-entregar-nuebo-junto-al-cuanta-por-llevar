@@ -24,18 +24,26 @@ export async function findCloudRecord(api, ownerId, code) {
     }
     return null;
 }
-export function startWifiReceiver({fetcher = fetch, canRead, isModalOpen, show, status, schedule = (fn) => setTimeout(fn, 1200)}) {
+export function startWifiReceiver({fetcher = fetch, canRead, isModalOpen, show, status, closeModal, subscribe, schedule = (fn) => setTimeout(fn, 1200)}) {
     let stopped = false;
+    let running = false;
+    let unsubscribe;
     let confirming = null;
     async function json(path, options = {}) {
         const response = await fetcher(path, {...options, credentials:'same-origin', cache:'no-store', signal:AbortSignal.timeout(12000)});
         if (!response.ok) throw new Error('Receptor local no disponible');
         return response.json();
     }
-    async function tick() {
+    async function tick(reschedule = true) {
+        if (running || stopped) return;
+        running = true;
         try {
             if (stopped || !canRead()) return;
             if (confirming) {
+                if (isModalOpen() && closeModal) {
+                    const popup = await json('/popup-state');
+                    if (popup.closed && popup.evento === confirming) closeModal();
+                }
                 if (isModalOpen()) return;
                 await json('/ack', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({evento:confirming})});
                 confirming = null;
@@ -46,12 +54,13 @@ export function startWifiReceiver({fetcher = fetch, canRead, isModalOpen, show, 
             status(`${result.pendientes} lecturas pendientes · lector Wi-Fi listo`);
             const event = result.events?.[0];
             if (event) {
-                const shown = await show(event.codigo);
+                const shown = await show(event.codigo, event.evento);
                 if (shown !== false) confirming = event.evento;
             }
         } catch (error) { status(error.message || 'Sin conexión; lecturas pendientes'); }
-        finally { if (!stopped) schedule(tick); }
+        finally { running = false; if (!stopped && reschedule) schedule(() => tick()); }
     }
+    if (subscribe) unsubscribe = subscribe(() => tick(false));
     tick();
-    return () => { stopped = true; };
+    return () => { stopped = true; if (unsubscribe) unsubscribe(); };
 }

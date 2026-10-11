@@ -1,8 +1,27 @@
-VERSIÓN 1.3 - CUENTAS CONFIGURADO
+NUEVO: CÁMARA FLOTANTE Y VENTANA WINDOWS
+
+1. Cierra el receptor anterior. Extrae todo el ZIP nuevo y abre INICIAR_GRAFIPLOT.bat.
+2. Entra a Grafiplot. Deja el navegador y la consola abiertos; puedes usar otros programas.
+3. Instala la APK incluida como actualización, sin desinstalar la anterior.
+4. Conserva la dirección y clave de conexión que ya pusiste. Pulsa Probar conexión.
+5. Pulsa Escanear en ventana flotante. Concede permiso de cámara y notificaciones.
+6. Activa Mostrar sobre otras apps para QR Clientes y vuelve a la APK.
+7. Verás la cámara trasera en una ventana pequeña. Arrástrala desde el título.
+8. Cambia de aplicación: la cámara flotante seguirá visible y leyendo.
+9. Acerca un QR. Windows mostrará una ventana con cliente, deuda y detalle sobre otros programas.
+10. Cierra esa ventana para pasar al siguiente QR. No hace falta volver al navegador para cerrarla.
+11. Detener, en la ventana flotante, apaga el lector.
+
+Prueba primero con el teléfono desbloqueado. Otra app que use la cámara puede interrumpirla.
+En Windows, deja Grafiplot abierto y con sesión iniciada: el navegador consulta tus registros.
+La ventana se muestra sobre ventanas normales del escritorio; no aparece sobre la pantalla de bloqueo.
+Esta versión fue compilada y su firma comprobada. Cámara flotante y ventana Windows requieren prueba en tus dispositivos.
+
+VERSIÓN 1.4 - CUENTAS CONFIGURADO
 
 Si aparecen cuatro casillas vacías, estás viendo una versión anterior.
 Cierra la consola antigua, extrae este ZIP en una carpeta nueva y abre
-INICIAR_GRAFIPLOT.bat. En el acceso debe verse VERSIÓN 1.3.
+INICIAR_GRAFIPLOT.bat. En el acceso debe verse VERSIÓN 1.4.
 El correo está preparado en el paquete personal. Escribe tu contraseña
 de Grafiplot la primera vez; no compartas esa contraseña.
 

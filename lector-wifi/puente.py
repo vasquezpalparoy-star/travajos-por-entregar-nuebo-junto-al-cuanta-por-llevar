@@ -12,6 +12,7 @@ import webbrowser
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from ventana import Ventana
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -46,7 +47,8 @@ class Lecturas:
 
 class Puente(ThreadingHTTPServer):
     daemon_threads = True
-    def __init__(self, datos, host='0.0.0.0', port=8765, root=ROOT):
+    def __init__(self, datos, host='0.0.0.0', port=8765, root=ROOT, popup=None):
+        self.popup=popup; self.popup_lock=threading.Lock(); self.changes=threading.Condition(); self.generation=0;
         self.datos=datos; self.browser_token=secrets.token_hex(32); self.root=Path(root)
         super().__init__((host,port), Handler)
     def local_host(self): return f'127.0.0.1:{self.server_port}'
@@ -88,30 +90,56 @@ class Handler(BaseHTTPRequestHandler):
             try: content=(self.server.root / filename).read_bytes()
             except OSError: return self.response(404,{'error':'Falta un archivo del sistema. Extrae todo el ZIP.'})
             return self.raw(200,content,'text/javascript; charset=utf-8' if filename.endswith('.mjs') else 'text/html; charset=utf-8',cookie=True)
-        if self.path in ('/connection','/events'):
+        if self.path == '/live':
+            if not self.browser(): return self.response(403,{'error':'Acceso local no autorizado'})
+            self.send_response(200);self.send_header('Content-Type','text/event-stream');self.send_header('Cache-Control','no-store');self.end_headers()
+            try:
+                generation=-1
+                while True:
+                    with self.server.changes:
+                        if generation==self.server.generation:self.server.changes.wait(timeout=2)
+                        generation=self.server.generation
+                    self.wfile.write(b'data: wake\n\n');self.wfile.flush()
+            except (OSError,ConnectionError):return
+        if self.path in ('/connection','/events','/popup-state'):
             if not self.browser(): return self.response(403,{'error':'Acceso local no autorizado'})
             if self.path=='/connection': return self.response(200,{'url':f'http://{self.server.ip_wifi()}:{self.server.server_port}','token':self.server.datos.token})
+            if self.path=='/popup-state':
+                popup=self.server.popup
+                return self.response(200,{'closed':bool(popup and popup.event and popup.closed(popup.event)),'evento':popup.event if popup else None})
             events,count=self.server.datos.pendientes();return self.response(200,{'events':events,'pendientes':count})
         self.response(404,{'error':'Ruta no encontrada'})
     def do_POST(self):
         self.connection.settimeout(5)
         if self.path == '/scan':
             if not self.device(): return self.response(401,{'error':'Clave incorrecta'})
-        elif self.path == '/ack':
+        elif self.path in ('/ack','/popup'):
             if not self.browser(mutation=True): return self.response(403,{'error':'Acceso local no autorizado'})
         else: return self.response(404,{'error':'Ruta no encontrada'})
         try:
             size=int(self.headers.get('Content-Length','0'))
-            if not 0<size<=4096: return self.response(413,{'error':'Petición demasiado grande'})
+            if not 0<size<=(16384 if self.path=='/popup' else 4096): return self.response(413,{'error':'Petición demasiado grande'})
             obj=json.loads(self.rfile.read(size))
             if not isinstance(obj,dict): raise ValueError('Lectura inválida')
             evento=obj.get('evento')
             if not isinstance(evento,str) or not 1<=len(evento)<=100: raise ValueError('Evento inválido')
-            if self.path=='/ack': self.server.datos.confirmar(evento)
+            if self.path=='/popup':
+                text=obj.get('text')
+                if not isinstance(text,str) or not 1<=len(text)<=3000:raise ValueError('Detalle inválido')
+                events,_=self.server.datos.pendientes()
+                if not events or events[0]['evento']!=evento:raise ValueError('Lectura no pendiente')
+                with self.server.popup_lock:
+                    if self.server.popup:self.server.popup.show(evento,text)
+            elif self.path=='/ack':
+                self.server.datos.confirmar(evento)
+                with self.server.popup_lock:
+                    if self.server.popup:self.server.popup.hide(evento)
             else:
                 codigo=obj.get('codigo')
                 if not isinstance(codigo,str) or not 1<=len(codigo.strip())<=256: raise ValueError('Código inválido')
                 self.server.datos.guardar(evento,codigo.strip())
+                with self.server.changes:
+                    self.server.generation+=1;self.server.changes.notify_all()
             self.response(200,{'ok':True})
         except (ValueError,TypeError,KeyError) as e:self.response(400,{'error':str(e)})
         except OverflowError as e:self.response(503,{'error':str(e)})
@@ -122,11 +150,15 @@ def main():
     folder=Path(os.environ.get('LOCALAPPDATA',str(Path.home()))) / 'GrafiplotLectorWiFi'
     try: server=Puente(Lecturas(folder),port=args.port)
     except OSError as e: raise SystemExit(f'No se pudo abrir el puerto {args.port}. Cierra el receptor anterior. {e}')
+    try: server.popup=Ventana()
+    except OSError as e: print('No se pudo abrir ventana Windows:',e)
     url=f'http://{server.local_host()}/'
-    print('Grafiplot 1.3 - CUENTAS configurado. Mantén esta ventana abierta.');print('Carpeta del sistema:',ROOT);print('Abre en esta PC:',url)
+    print('Grafiplot 1.4 - CUENTAS configurado. Mantén esta ventana abierta.');print('Carpeta del sistema:',ROOT);print('Abre en esta PC:',url)
     print('Inicia sesión con el MISMO proyecto y cuenta Supabase de tu sistema.');print('Detener: Ctrl+C')
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
-    finally: server.server_close()
+    finally:
+        server.server_close()
+        if server.popup:server.popup.close()
 if __name__=='__main__':main()

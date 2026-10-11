@@ -7,6 +7,7 @@ import android.hardware.camera2.*;
 import android.media.*;
 import android.graphics.ImageFormat;
 import android.util.Size;
+import android.view.Surface;
 import com.google.zxing.*;
 import com.google.zxing.common.HybridBinarizer;
 import java.nio.ByteBuffer;
@@ -21,6 +22,8 @@ public class ScannerService extends Service {
  PowerManager.WakeLock wake; android.net.wifi.WifiManager.WifiLock wifi;
  PendingDb db; ScheduledExecutorService network; volatile boolean stopped=false; boolean opening=false;
  long lastFrame=0,lastSeen=0;String lastCode="";
+ FloatingCamera floating; volatile Surface previewSurface; int previewWidth=640,previewHeight=480,sensorOrientation=90;
+ int configuration=0;
  int afMode=CaptureRequest.CONTROL_AF_MODE_OFF;
  MultiFormatReader decoder=new MultiFormatReader();
  public IBinder onBind(Intent i){return null;}
@@ -36,30 +39,38 @@ public class ScannerService extends Service {
   wifi=((android.net.wifi.WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE)).createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF,"QRClientes:WiFi");wifi.acquire();
   network=Executors.newSingleThreadScheduledExecutor();network.scheduleWithFixedDelay(()->sendPending(),0,2,TimeUnit.SECONDS);
  }
- public int onStartCommand(Intent i,int flags,int id){if(i!=null&&"STOP".equals(i.getAction())){stopSelf();return START_NOT_STICKY;}handler.post(()->openCamera());return START_NOT_STICKY;}
- void state(String msg){getSharedPreferences("qr",0).edit().putString("estado",msg).apply();}
+ public int onStartCommand(Intent i,int flags,int id){if(i!=null&&"STOP".equals(i.getAction())){stopSelf();return START_NOT_STICKY;}if(i!=null&&i.getBooleanExtra("floating",false)){if(floating==null)floating=new FloatingCamera(this);floating.show();}handler.post(()->openCamera());return START_NOT_STICKY;}
+ void state(String msg){if(floating!=null)floating.state(msg);getSharedPreferences("qr",0).edit().putString("estado",msg).apply();}
  void openCamera(){
   if(stopped||camera!=null||opening)return;opening=true;
   try{
    CameraManager m=(CameraManager)getSystemService(CAMERA_SERVICE);String cameraId=null;CameraCharacteristics characteristics=null;
    for(String id:m.getCameraIdList()){CameraCharacteristics cc=m.getCameraCharacteristics(id);Integer facing=cc.get(CameraCharacteristics.LENS_FACING);if(facing!=null&&facing==CameraCharacteristics.LENS_FACING_BACK){cameraId=id;characteristics=cc;break;}}
    if(cameraId==null)throw new Exception("Este celular no tiene cámara trasera");
+   Integer orientation=characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);if(orientation!=null)sensorOrientation=orientation;
    int[] modes=characteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES);
    if(modes!=null)for(int mode:modes)if(mode==CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)afMode=mode;
    Size[] sizes=characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.YUV_420_888);
-   Size size=Arrays.stream(sizes).min(Comparator.comparingLong(s->Math.abs((long)s.getWidth()*s.getHeight()-640L*480))).get();
+   Size[] previewSizes=characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(android.graphics.SurfaceTexture.class);
+   Set<String> supported=new HashSet<>();for(Size ps:previewSizes)supported.add(ps.toString());
+   Size size=Arrays.stream(sizes).filter(s->supported.contains(s.toString())).min(Comparator.comparingLong(s->Math.abs((long)s.getWidth()*s.getHeight()-640L*480))).get();
+   previewWidth=size.getWidth();previewHeight=size.getHeight();
    images=ImageReader.newInstance(size.getWidth(),size.getHeight(),ImageFormat.YUV_420_888,2);images.setOnImageAvailableListener(r->analyze(r),handler);
    m.openCamera(cameraId,new CameraDevice.StateCallback(){
-    public void onOpened(CameraDevice c){opening=false;if(stopped){c.close();return;}camera=c;setup();}
+    public void onOpened(CameraDevice c){opening=false;if(stopped){c.close();return;}camera=c;setup();if(floating!=null)floating.updatePreview();}
     public void onDisconnected(CameraDevice c){c.close();camera=null;opening=false;retry("Cámara interrumpida; reintentando");}
     public void onError(CameraDevice c,int error){c.close();camera=null;opening=false;retry("Cámara ocupada o bloqueada; abre la app si persiste");}
    },handler);
   }catch(Exception e){opening=false;retry("No se pudo abrir cámara: "+e.getMessage());}
  }
  void setup(){try{
-  camera.createCaptureSession(Collections.singletonList(images.getSurface()),new CameraCaptureSession.StateCallback(){
-   public void onConfigured(CameraCaptureSession s){if(stopped||camera==null){s.close();return;}session=s;try{CaptureRequest.Builder b=camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);b.addTarget(images.getSurface());b.set(CaptureRequest.CONTROL_AF_MODE,afMode);s.setRepeatingRequest(b.build(),null,handler);state("Cámara activa · esperando QR");}catch(Exception e){retry("Error de captura; reintentando");}}
-   public void onConfigureFailed(CameraCaptureSession s){retry("Error de cámara; reintentando");}
+  if(session!=null){session.close();session=null;}
+  if(camera==null||images==null||stopped)return;
+  final int generation=++configuration;
+  List<Surface> surfaces=new ArrayList<>();surfaces.add(images.getSurface());final Surface shown=previewSurface;if(shown!=null&&shown.isValid())surfaces.add(shown);
+  camera.createCaptureSession(surfaces,new CameraCaptureSession.StateCallback(){
+   public void onConfigured(CameraCaptureSession s){if(stopped||camera==null||generation!=configuration){s.close();return;}session=s;try{CaptureRequest.Builder b=camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);b.addTarget(images.getSurface());if(shown!=null&&shown.isValid())b.addTarget(shown);b.set(CaptureRequest.CONTROL_AF_MODE,afMode);s.setRepeatingRequest(b.build(),null,handler);state("Cámara activa · esperando QR");}catch(Exception e){retry("Error de captura; reintentando");}}
+   public void onConfigureFailed(CameraCaptureSession s){if(generation!=configuration||stopped)return;retry("Error de cámara; reintentando");}
   },handler);
  }catch(Exception e){retry("Cámara no disponible; reintentando");}}
  void retry(String msg){state(msg);if(stopped)return;handler.postDelayed(()->{if(stopped)return;closeCamera();openCamera();},5000);}
@@ -90,7 +101,7 @@ public class ScannerService extends Service {
   }catch(Exception e){if(!stopped)state("PC sin conexión · lecturas guardadas, reintentando");}finally{if(c!=null)c.disconnect();}
  }
  public void onDestroy(){
-  stopped=true;if(network!=null){network.shutdownNow();}
+  stopped=true;if(floating!=null)floating.remove();if(network!=null){network.shutdownNow();}
   if(handler!=null){handler.removeCallbacksAndMessages(null);handler.post(()->{closeCamera();thread.quitSafely();});}
   if(wake!=null&&wake.isHeld())wake.release();if(wifi!=null&&wifi.isHeld())wifi.release();state("Lector detenido");stopForeground(true);super.onDestroy();
  }

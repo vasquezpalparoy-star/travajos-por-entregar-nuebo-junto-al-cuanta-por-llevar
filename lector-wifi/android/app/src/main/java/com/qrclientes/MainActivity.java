@@ -11,7 +11,7 @@ import java.net.*;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
- EditText address,token; TextView status; LinearLayout panel; boolean dark=false;
+ EditText address,token; TextView status; LinearLayout panel; boolean dark=false; boolean startFloating=false,waitingOverlay=false;
  Handler handler=new Handler();
  Runnable update=new Runnable(){public void run(){if(status!=null)status.setText(getSharedPreferences("qr",0).getString("estado","Lector detenido"));handler.postDelayed(this,1500);}};
  public void onCreate(Bundle saved){super.onCreate(saved);showForm();handler.post(update);}
@@ -20,12 +20,14 @@ public class MainActivity extends Activity {
   WindowManager.LayoutParams p=getWindow().getAttributes();p.screenBrightness=-1;getWindow().setAttributes(p);
   panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(28,30,28,20);
   ScrollView scroll=new ScrollView(this);scroll.addView(panel);setContentView(scroll);
-  label("QR Clientes",26);label("Cámara trasera · conexión Wi-Fi a tu PC",16);
+  label("QR Clientes · versión 1.4",26);label("Cámara trasera · conexión Wi-Fi a tu PC",16);
   label("Dirección que muestra el programa de PC",14);
   address=new EditText(this);address.setSingleLine();address.setInputType(17);address.setHint("http://192.168.1.10:8765");address.setText(getSharedPreferences("qr",0).getString("url",""));panel.addView(address);
   label("Clave de conexión de la PC",14);token=new EditText(this);token.setSingleLine();token.setText(getSharedPreferences("qr",0).getString("token",""));panel.addView(token);
   button("Probar conexión",()->test());
-  button("Iniciar lector en segundo plano",()->start());
+  button("Escanear en ventana flotante",()->{startFloating=true;start();});
+  button("Iniciar lector sin ventana",()->{startFloating=false;start();});
+  button("Permitir mostrar sobre otras apps",()->overlaySettings());
   button("Detener lector",()->{stopService(new Intent(this,ScannerService.class));getSharedPreferences("qr",0).edit().putString("estado","Lector detenido").apply();});
   button("Pantalla negra (toca para volver)",()->black());
   button("Ajustes de batería",()->{try{startActivity(new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));}catch(Exception e){Toast.makeText(this,"Abre Ajustes > Aplicaciones > QR Clientes > Batería",1).show();}});
@@ -48,17 +50,21 @@ public class MainActivity extends Activity {
   catch(Exception e){result="Sin conexión. Revisa Wi-Fi, IP y firewall de la PC.";}finally{if(c!=null)c.disconnect();}
   final String msg=result;runOnUiThread(()->Toast.makeText(this,msg,1).show());
  }).start();}
+ void overlaySettings(){try{startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,android.net.Uri.parse("package:"+getPackageName())));}catch(Exception e){Toast.makeText(this,"Abre Ajustes > QR Clientes > Mostrar sobre otras apps",1).show();}}
+ public void onResume(){super.onResume();if(waitingOverlay){waitingOverlay=false;if(android.provider.Settings.canDrawOverlays(this))start();else Toast.makeText(this,"Activa Mostrar sobre otras apps para usar la cámara flotante",1).show();}}
  void start(){
   if(!save())return;
   if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.CAMERA},1);return;}
   if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},2);return;}
+  if(startFloating&&!android.provider.Settings.canDrawOverlays(this)){waitingOverlay=true;overlaySettings();return;}
   begin();
  }
  void begin(){
-  try{startForegroundService(new Intent(this,ScannerService.class));Toast.makeText(this,"Lector iniciado; puedes cambiar de aplicación",1).show();}
+  try{startForegroundService(new Intent(this,ScannerService.class).putExtra("floating",startFloating));Toast.makeText(this,"Lector iniciado; puedes cambiar de aplicación",1).show();}
   catch(Exception e){Toast.makeText(this,"No se pudo iniciar: "+e.getMessage(),1).show();}
  }
- public void onRequestPermissionsResult(int req,String[] p,int[] r){super.onRequestPermissionsResult(req,p,r);if(req==1&&r.length>0&&r[0]==PackageManager.PERMISSION_GRANTED)start();else if(req==2)begin();}
+ public void onRequestPermissionsResult(int req,String[] p,int[] r){super.onRequestPermissionsResult(req,p,r);if(req==1&&r.length>0&&r[0]==PackageManager.PERMISSION_GRANTED)start();else if(req==2)startAfterNotifications();}
+ void startAfterNotifications(){if(startFloating&&!android.provider.Settings.canDrawOverlays(this)){waitingOverlay=true;overlaySettings();}else begin();}
  void black(){dark=true;getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);WindowManager.LayoutParams p=getWindow().getAttributes();p.screenBrightness=0.01f;getWindow().setAttributes(p);TextView black=new TextView(this);black.setBackgroundColor(Color.BLACK);black.setOnClickListener(v->showForm());setContentView(black);}
  public void onBackPressed(){if(dark)showForm();else super.onBackPressed();}
  public void onDestroy(){handler.removeCallbacks(update);super.onDestroy();}

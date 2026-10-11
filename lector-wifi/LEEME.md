@@ -59,3 +59,11 @@ Abre `INICIAR_GRAFIPLOT.bat` desde la carpeta extraida, no desde dentro del ZIP.
 ## Conexión preconfigurada
 
 Esta versión incluye la URL y la clave pública del proyecto CUENTAS. No contiene contraseñas ni sesiones de ningún usuario. Escribe tu correo y contraseña de Grafiplot una vez en la PC; la sesión se conserva en ese navegador mientras siga válida. En Android solo se configura la dirección local de la PC y la clave de conexión que muestra el panel Wi-Fi.
+
+## Versión 1.4
+
+La APK incluye vista previa de cámara trasera en una ventana flotante con permiso Mostrar sobre otras apps. Iniciar desde la app visible, luego cambiar de aplicación. Detener desde la ventana o notificación.
+
+Windows abre una ventana nativa `TopMost` con cliente, deuda y detalle. El navegador debe quedar abierto y autenticado; un canal de eventos despierta la consulta al recibir QR y el cierre de la ventana confirma la lectura. Los datos se consultan en el sistema existente, sin cambiar permisos de Supabase. El detalle de la ventana se pasa por archivos temporales y se elimina al detener el receptor.
+
+Validación: pruebas de receptor, autorización local, eventos, confirmación y cálculo de deuda; APK compilada y firmada. No se ha ejecutado en hardware Android ni en Windows real.
