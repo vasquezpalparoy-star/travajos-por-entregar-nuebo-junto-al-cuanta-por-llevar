@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.sqlite
+*.sqlite-*
+*.p12
+*.jks
+local.properties
+.gradle/
+build/
+*.apk.idsig

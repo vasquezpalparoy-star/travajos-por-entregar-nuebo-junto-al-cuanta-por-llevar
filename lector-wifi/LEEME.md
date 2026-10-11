@@ -1,0 +1,53 @@
+# Grafiplot + lector Android por Wi-Fi
+
+La APK lee QR con la **cámara trasera**, incluso al cambiar de aplicación, y envía el código al receptor de la PC. El navegador consulta el trabajo en tu sistema Grafiplot y abre su ventana con cliente, descripción, ubicación y deuda: **total menos pago a cuenta**, nunca inferior a cero.
+
+## Instalación
+
+1. Descarga y extrae **todo** el proyecto de la rama `integracion-qr-camara-trasera` (o el ZIP entregado). El receptor necesita `index.html` y `qr-wifi.mjs` en la carpeta superior.
+2. En Windows instala Python 3.12 o superior, incluyendo el lanzador `py`. El receptor no necesita paquetes adicionales.
+3. Abre `lector-wifi/INICIAR_WINDOWS.bat`. Se abre Grafiplot en `http://127.0.0.1:8765/`. Deja la consola y esa pestaña abiertas. Inicia sesión con **el mismo proyecto Supabase, clave pública y cuenta** que utilizas actualmente. El navegador local puede pedir esta configuración nuevamente porque es una dirección distinta de GitHub Pages.
+4. En el panel **Conectar APK por Wi-Fi · cámara trasera**, despliega la dirección y la clave de conexión.
+5. Instala `lector-wifi/QRClientes-Camara-Trasera.apk` en Android 10 o superior. Puedes actualizar la APK anterior sin desinstalarla; ambas versiones entregadas llevan la misma firma. Permite instalar desde la fuente donde abriste el archivo.
+6. Copia dirección y clave en la APK. Pulsa **Probar conexión** y después **Iniciar lector en segundo plano**. Concede cámara y notificaciones.
+7. Acerca un QR que ya use tu sistema (por ejemplo `001`) a la cámara trasera. La ventana se abre **dentro de Grafiplot en el navegador de la PC**. Cierra o acepta una consulta para ver la siguiente.
+
+**Conexión correcta:** PC por cable **Ethernet al router**, Android por **Wi-Fi al mismo router**. También funciona si la PC utiliza Wi-Fi. No conectes el celular a una red de invitados con aislamiento. Permite TCP entrante 8765 en el Firewall de Windows **para la red privada**. No abras puertos del router hacia internet. Si la dirección mostrada corresponde a una VPN, reemplázala por la IPv4 Ethernet de `ipconfig`, conservando `:8765`.
+
+## Registros y datos
+
+- Las fichas se crean y actualizan en el formulario original **Registro de Trabajo**, en la tabla Supabase `pedidos_pendientes` y bajo tu usuario. El receptor no crea una segunda base de clientes.
+- Se consultan los trabajos con estado `pendiente` del usuario que inició sesión. Un código libre permite pasar al formulario y asignarlo a un nuevo registro.
+- La lectura de un QR no cobra, no registra un pago ni marca el trabajo como entregado. Para cambiar el pago a cuenta, edita el registro en tu sistema.
+- **Necesitas internet en la PC** para consultar y guardar en Supabase y cargar las librerías de la web. La APK transmite solo el QR por la red local y no necesita acceder a Supabase.
+- La APK guarda hasta 1000 lecturas sin conexión. El receptor guarda hasta 1000 lecturas pendientes en `%LOCALAPPDATA%\GrafiplotLectorWiFi\lecturas.sqlite`, incluyendo su clave local. No subas ese archivo a GitHub.
+- Los reenvíos de un mismo evento no generan consultas duplicadas. La lectura se confirma después de cerrar la ventana. Si cierras o reinicias el receptor antes, se vuelve a presentar al abrir el sistema.
+- Si falla la consulta de Supabase, la lectura permanece pendiente; no se muestra como código libre por un error de red. Si hay registros duplicados para el código, se informa para corregirlos.
+- Deja abierta una sola pestaña receptora. La ventana es un modal del sistema; el navegador puede impedir que se ponga por encima de otros programas si está minimizado.
+- Configura el mismo usuario y proyecto antes de procesar lecturas pendientes. La clave de conexión de la APK es distinta de la clave pública Supabase. Nunca uses una clave `service_role` ni `sb_secret_` en la página.
+
+## Segundo plano en Android
+
+Inicia el lector desde la APK mientras esté visible. Luego puedes cambiar de aplicación; se mantiene una notificación permanente con botón **Detener**. Puedes probar el bloqueo de pantalla. En ajustes de batería de QR Clientes selecciona **Sin restricciones**; algunos fabricantes tienen permisos adicionales para actividad en segundo plano.
+
+No se garantiza funcionamiento con pantalla bloqueada en todos los modelos. Si tu celular interrumpe la cámara, utiliza **Pantalla negra**: deja la app visible, con pantalla encendida y brillo mínimo. Un teléfono completamente apagado no puede escanear. Después de reiniciar o forzar detención, abre la APK e inicia el lector. Otra app que use la cámara puede interrumpirla; el servicio intenta recuperarla. Para uso todo el día, prueba consumo y temperatura en tu celular y manténlo cargado y ventilado.
+
+## Prueba con tus registros
+
+Guarda un trabajo con total S/ 20 y pago a cuenta S/ 5, asignado a un código libre. Escanea el QR de ese código: debe mostrar **Debe S/ 15.00** y su descripción. Esta prueba escribe un registro real; usa datos de prueba que puedas identificar.
+
+## Compilación y verificación
+
+Abre `lector-wifi/android` en Android Studio con JDK 17, SDK 35 y Gradle compatible con AGP 8.7.3. Compila `app > assembleDebug`. La APK generada con otra firma no actualizará la entregada: tendrás que desinstalar la anterior. Conserva la firma de producción si vas a distribuir futuras actualizaciones.
+
+Pruebas sin credenciales ni modificación de la nube:
+
+```sh
+python -m unittest discover -s tests -v
+node --test tests/qr-wifi.test.mjs
+```
+
+Se verifica HTTP, persistencia, autenticación, restricción de la interfaz a la PC local, reenvíos, normalización de QR, deuda y consultas limitadas al usuario y a trabajos pendientes. La integración de Supabase usa respuestas simuladas en las pruebas. **No se ha probado con tu cuenta Supabase ni en un teléfono físico**. Valida la instalación y una jornada de uso antes de depender de ella.
+
+ZXing Core 3.5.3: https://github.com/zxing/zxing (Apache-2.0).
+Android servicios de cámara: https://developer.android.com/develop/background-work/services/fgs/service-types.
