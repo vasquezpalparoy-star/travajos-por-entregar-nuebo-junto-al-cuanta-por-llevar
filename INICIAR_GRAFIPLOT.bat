@@ -1,4 +1,5 @@
 @echo off
+title Grafiplot 1.3 - CUENTAS configurado
 cd /d "%~dp0"
 if not exist "lector-wifi\INICIAR_WINDOWS.bat" (
  echo Extrae TODO el ZIP. Falta la carpeta lector-wifi.

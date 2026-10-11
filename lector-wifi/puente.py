@@ -123,7 +123,7 @@ def main():
     try: server=Puente(Lecturas(folder),port=args.port)
     except OSError as e: raise SystemExit(f'No se pudo abrir el puerto {args.port}. Cierra el receptor anterior. {e}')
     url=f'http://{server.local_host()}/'
-    print('Grafiplot Wi-Fi activo. Mantén esta ventana abierta.');print('Abre en esta PC:',url)
+    print('Grafiplot 1.3 - CUENTAS configurado. Mantén esta ventana abierta.');print('Carpeta del sistema:',ROOT);print('Abre en esta PC:',url)
     print('Inicia sesión con el MISMO proyecto y cuenta Supabase de tu sistema.');print('Detener: Ctrl+C')
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()

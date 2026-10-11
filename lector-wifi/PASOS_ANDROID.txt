@@ -1,3 +1,11 @@
+VERSIÓN 1.3 - CUENTAS CONFIGURADO
+
+Si aparecen cuatro casillas vacías, estás viendo una versión anterior.
+Cierra la consola antigua, extrae este ZIP en una carpeta nueva y abre
+INICIAR_GRAFIPLOT.bat. En el acceso debe verse VERSIÓN 1.3.
+El correo está preparado en el paquete personal. Escribe tu contraseña
+de Grafiplot la primera vez; no compartas esa contraseña.
+
 ANDROID: CAMARA TRASERA + GRAFIPLOT EN LA PC
 
 PRIMERO EN LA PC
