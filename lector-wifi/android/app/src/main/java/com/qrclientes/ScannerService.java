@@ -29,7 +29,7 @@ public class ScannerService extends Service {
  public class LocalBinder extends Binder { ScannerService getService(){return ScannerService.this;} }
  final IBinder binder=new LocalBinder();
  public IBinder onBind(Intent i){return binder;}
- void attachPreview(Object owner,Surface surface){handler.post(()->{if(stopped||!surface.isValid())return;if(previewOwner==owner&&previewSurface==surface)return;previewOwner=owner;previewSurface=surface;if(camera!=null)setup();});}
+ void attachPreview(Object owner,Surface surface,boolean force){handler.post(()->{if(stopped||!surface.isValid())return;if(!force&&previewOwner==owner&&previewSurface==surface)return;previewOwner=owner;previewSurface=surface;if(camera!=null)setup();});}
  void detachPreview(Object owner,Runnable done){handler.post(()->{if(previewOwner==owner){previewOwner=null;previewSurface=null;if(!stopped&&camera!=null)setup();}done.run();});}
  public void onCreate(){
   super.onCreate();db=new PendingDb(this);thread=new HandlerThread("QR-Camera");thread.start();handler=new Handler(thread.getLooper());
@@ -55,7 +55,7 @@ public class ScannerService extends Service {
    int[] modes=characteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES);
    if(modes!=null){for(int mode:modes)if(mode==CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)afMode=mode;for(int mode:modes)if(mode==CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)afMode=mode;}
    Size[] sizes=characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.YUV_420_888);
-   Size[] previewSizes=characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(android.graphics.SurfaceTexture.class);
+   Size[] previewSizes=characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(android.view.SurfaceHolder.class);
    Set<String> supported=new HashSet<>();for(Size ps:previewSizes)supported.add(ps.toString());
    Size size=Arrays.stream(sizes).filter(s->supported.contains(s.toString())).min(Comparator.comparingLong(s->Math.abs((long)s.getWidth()*s.getHeight()-1280L*720))).get();
    previewWidth=size.getWidth();previewHeight=size.getHeight();

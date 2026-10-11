@@ -75,3 +75,7 @@ Sustituye la ventana flotante por una pantalla de cámara dentro de la APK. Abri
 ## Versión 1.6
 
 Envío inmediato al detectar QR, análisis cada 180 ms como máximo y lectura de novedades de ventana Windows cada 100 ms. La ficha de Windows sigue el estilo de Grafiplot y recibe campos estructurados validados. Se mantiene la consulta actual de datos al leer cada QR; no se utiliza una deuda almacenada en caché. Las cifras indican intervalos programados, no latencia total garantizada.
+
+## APK 1.7
+
+Reemplaza TextureView y su matriz manual por SurfaceView con proporciones conservadas. Android gestiona la rotación del buffer; la app calcula únicamente el ajuste completo de la imagen según sensor y pantalla, con márgenes negros. Se verifican 64 combinaciones de orientación y tamaño de vista y dos geometrías de referencia. No se ha probado la imagen en hardware Android real. El receptor Windows sigue en versión 1.6.

@@ -11,7 +11,7 @@ import java.net.*;
 
 
 public class MainActivity extends Activity {
- EditText address,token; TextView status,lastRead,connectionStatus; LinearLayout panel; boolean dark=false; boolean scannerScreen=false,bound=false,resumed=false; ScannerService scanner; Handler cameraCleanup; TextureView preview; Surface previewSurface;
+ EditText address,token; TextView status,lastRead,connectionStatus; LinearLayout panel; boolean dark=false; boolean scannerScreen=false,bound=false,resumed=false; ScannerService scanner; Handler cameraCleanup; CameraPreview preview; Surface previewSurface;
  Handler handler=new Handler();
  Runnable update=new Runnable(){public void run(){if(scannerScreen&&scanner!=null&&resumed)attachPreview();if(lastRead!=null)lastRead.setText("Último QR: "+getSharedPreferences("qr",0).getString("ultimoQR","ninguno detectado"));if(connectionStatus!=null)connectionStatus.setText(getSharedPreferences("qr",0).getString("conexion","Conexión: pulsa Probar conexión"));if(status!=null)status.setText(getSharedPreferences("qr",0).getString("estado","Lector detenido"));handler.postDelayed(this,500);}};
  public void onCreate(Bundle saved){super.onCreate(saved);if(saved!=null&&saved.getBoolean("scannerScreen"))showScanner();else showForm();handler.post(update);}
@@ -21,7 +21,7 @@ public class MainActivity extends Activity {
   WindowManager.LayoutParams p=getWindow().getAttributes();p.screenBrightness=-1;getWindow().setAttributes(p);
   panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(28,30,28,20);
   ScrollView scroll=new ScrollView(this);scroll.addView(panel);setContentView(scroll);
-  label("QR Clientes · versión 1.6",26);label("Cámara trasera · conexión Wi-Fi a tu PC",16);
+  label("QR Clientes · versión 1.7",26);label("Cámara trasera · conexión Wi-Fi a tu PC",16);
   label("Dirección que muestra el programa de PC",14);
   address=new EditText(this);address.setSingleLine();address.setInputType(17);address.setHint("http://192.168.1.10:8765");address.setText(getSharedPreferences("qr",0).getString("url",""));panel.addView(address);
   label("Clave de conexión de la PC",14);token=new EditText(this);token.setSingleLine();token.setText(getSharedPreferences("qr",0).getString("token",""));panel.addView(token);
@@ -63,33 +63,33 @@ public class MainActivity extends Activity {
   else attachPreview();
  }
  void attachPreview(){
-  if(resumed&&scannerScreen&&scanner!=null&&preview!=null&&preview.isAvailable()){
-   preview.getSurfaceTexture().setDefaultBufferSize(scanner.previewWidth,scanner.previewHeight);
-   if(previewSurface==null)previewSurface=new Surface(preview.getSurfaceTexture());
-   scanner.attachPreview(this,previewSurface);transformPreview();
+  if(resumed&&scannerScreen&&scanner!=null&&preview!=null&&preview.getHolder().getSurface().isValid()){
+   transformPreview();previewSurface=preview.getHolder().getSurface();
+   scanner.attachPreview(this,previewSurface,false);
   }
  }
  void detachPreview(){
-  Surface old=previewSurface;previewSurface=null;
-  if(scanner!=null)scanner.detachPreview(this,()->{if(old!=null)old.release();});else if(old!=null)old.release();
+  previewSurface=null;
+  if(scanner!=null)scanner.detachPreview(this,()->{});
   if(bound){unbindService(connection);bound=false;}scanner=null;
  }
  void transformPreview(){
-  if(scanner==null||preview==null||preview.getWidth()==0||preview.getHeight()==0)return;
-  int w=preview.getWidth(),h=preview.getHeight(),rotation=(scanner.sensorOrientation-getWindowManager().getDefaultDisplay().getRotation()*90+360)%360;
-  android.graphics.Matrix m=new android.graphics.Matrix();m.postScale((float)scanner.previewWidth/w,(float)scanner.previewHeight/h);m.postRotate(rotation,scanner.previewWidth/2f,scanner.previewHeight/2f);
-  android.graphics.RectF bounds=new android.graphics.RectF(0,0,w,h);m.mapRect(bounds);m.postTranslate(-bounds.left,-bounds.top);m.postScale(w/bounds.width(),h/bounds.height());preview.setTransform(m);
+  if(scanner==null||preview==null)return;
+  preview.configure(scanner.previewWidth,scanner.previewHeight,scanner.sensorOrientation,getWindowManager().getDefaultDisplay().getRotation()*90);
  }
  void showScanner(){
   scannerScreen=true;dark=false;getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
   panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(16,16,16,16);setContentView(panel);
-  label("Cámara trasera · QR Clientes 1.6",20);
-  preview=new TextureView(this);panel.addView(preview,new LinearLayout.LayoutParams(-1,0,1));
-  preview.setSurfaceTextureListener(new TextureView.SurfaceTextureListener(){
-   public void onSurfaceTextureAvailable(android.graphics.SurfaceTexture t,int w,int h){connectPreview();attachPreview();}
-   public void onSurfaceTextureSizeChanged(android.graphics.SurfaceTexture t,int w,int h){transformPreview();}
-   public boolean onSurfaceTextureDestroyed(android.graphics.SurfaceTexture t){detachPreview();if(cameraCleanup==null||!cameraCleanup.post(()->t.release()))t.release();return false;}
-   public void onSurfaceTextureUpdated(android.graphics.SurfaceTexture t){}
+  label("Cámara trasera · QR Clientes 1.7",20);
+  FrameLayout viewfinder=new FrameLayout(this);viewfinder.setBackgroundColor(Color.BLACK);panel.addView(viewfinder,new LinearLayout.LayoutParams(-1,0,1));
+  preview=new CameraPreview(this);viewfinder.addView(preview,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
+  preview.getHolder().addCallback(new SurfaceHolder.Callback(){
+   public void surfaceCreated(SurfaceHolder holder){connectPreview();attachPreview();}
+   public void surfaceChanged(SurfaceHolder holder,int format,int w,int h){transformPreview();if(scanner!=null&&resumed)scanner.attachPreview(MainActivity.this,holder.getSurface(),true);}
+   public void surfaceDestroyed(SurfaceHolder holder){
+    detachPreview();
+    if(cameraCleanup!=null){java.util.concurrent.CountDownLatch done=new java.util.concurrent.CountDownLatch(1);if(cameraCleanup.post(()->done.countDown())){try{done.await(500,java.util.concurrent.TimeUnit.MILLISECONDS);}catch(InterruptedException e){Thread.currentThread().interrupt();}}}
+   }
   });
   status=label("Abriendo cámara…",16);lastRead=label("",15);connectionStatus=label("",15);
   label("Sostén el QR a 15–25 cm, con buena luz. El resultado aparecerá en la PC. Puedes cambiar de aplicación; el lector seguirá activo con una notificación.",14);
