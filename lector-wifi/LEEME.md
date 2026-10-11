@@ -67,3 +67,7 @@ La APK incluye vista previa de cámara trasera en una ventana flotante con permi
 Windows abre una ventana nativa `TopMost` con cliente, deuda y detalle. El navegador debe quedar abierto y autenticado; un canal de eventos despierta la consulta al recibir QR y el cierre de la ventana confirma la lectura. Los datos se consultan en el sistema existente, sin cambiar permisos de Supabase. El detalle de la ventana se pasa por archivos temporales y se elimina al detener el receptor.
 
 Validación: pruebas de receptor, autorización local, eventos, confirmación y cálculo de deuda; APK compilada y firmada. No se ha ejecutado en hardware Android ni en Windows real.
+
+## APK 1.5
+
+Sustituye la ventana flotante por una pantalla de cámara dentro de la APK. Abrir cámara y escanear inicia el servicio de cámara con la app visible. Seguir en segundo plano envía la tarea al fondo y separa únicamente la vista previa: continúa el análisis YUV y el envío de lecturas. Al volver, la vista previa se conecta al mismo servicio. No requiere SYSTEM_ALERT_WINDOW. La PC utiliza el receptor 1.4.1 existente.

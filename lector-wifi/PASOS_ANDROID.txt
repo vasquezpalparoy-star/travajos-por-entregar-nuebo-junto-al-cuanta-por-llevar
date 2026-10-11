@@ -1,84 +1,21 @@
-CORRECCIÓN WINDOWS 1.4.1
-Cierra la consola anterior. Extrae este ZIP en una carpeta nueva y abre INICIAR_GRAFIPLOT.bat.
-La APK es la misma versión 1.4: si ya la actualizaste, no hace falta instalarla otra vez.
+APK 1.5 - CÁMARA EN PANTALLA
 
-NUEVO: CÁMARA FLOTANTE Y VENTANA WINDOWS
+1. Instala la APK 1.5 como actualización, sin desinstalar la anterior.
+2. Conserva la URL y clave de conexión que ya pusiste. Pulsa Probar conexión.
+3. Pulsa Abrir cámara y escanear. Concede cámara y notificaciones.
+4. Verás la cámara trasera en pantalla y el estado de las lecturas.
+5. Pulsa Seguir en segundo plano para usar otras aplicaciones.
+6. El lector sigue activo con una notificación; tócala para abrir la app.
+7. Pulsa Abrir cámara y escanear para volver a la vista previa.
+8. Detener y volver apaga el lector y regresa a la configuración.
 
-1. Cierra el receptor anterior. Extrae todo el ZIP nuevo y abre INICIAR_GRAFIPLOT.bat.
-2. Entra a Grafiplot. Deja el navegador y la consola abiertos; puedes usar otros programas.
-3. Instala la APK incluida como actualización, sin desinstalar la anterior.
-4. Conserva la dirección y clave de conexión que ya pusiste. Pulsa Probar conexión.
-5. Pulsa Escanear en ventana flotante. Concede permiso de cámara y notificaciones.
-6. Activa Mostrar sobre otras apps para QR Clientes y vuelve a la APK.
-7. Verás la cámara trasera en una ventana pequeña. Arrástrala desde el título.
-8. Cambia de aplicación: la cámara flotante seguirá visible y leyendo.
-9. Acerca un QR. Windows mostrará una ventana con cliente, deuda y detalle sobre otros programas.
-10. Cierra esa ventana para pasar al siguiente QR. No hace falta volver al navegador para cerrarla.
-11. Detener, en la ventana flotante, apaga el lector.
+No hace falta el permiso Mostrar sobre otras apps.
+En la PC usa el receptor 1.4.1 que ya tienes; deja navegador y consola abiertos.
+No cierres el lector desde la pantalla de aplicaciones activas. Inícialo otra vez tras reiniciar el teléfono.
+Si el teléfono lo detiene, revisa Ajustes de batería desde la APK y permite actividad en segundo plano.
+La compilación y firma están verificadas. Falta probar la cámara y el cambio de aplicación en tu teléfono.
 
-Prueba primero con el teléfono desbloqueado. Otra app que use la cámara puede interrumpirla.
-En Windows, deja Grafiplot abierto y con sesión iniciada: el navegador consulta tus registros.
-La ventana se muestra sobre ventanas normales del escritorio; no aparece sobre la pantalla de bloqueo.
-Esta versión fue compilada y su firma comprobada. Cámara flotante y ventana Windows requieren prueba en tus dispositivos.
-
-VERSIÓN 1.4 - CUENTAS CONFIGURADO
-
-Si aparecen cuatro casillas vacías, estás viendo una versión anterior.
-Cierra la consola antigua, extrae este ZIP en una carpeta nueva y abre
-INICIAR_GRAFIPLOT.bat. En el acceso debe verse VERSIÓN 1.4.
-El correo está preparado en el paquete personal. Escribe tu contraseña
-de Grafiplot la primera vez; no compartas esa contraseña.
-
-ANDROID: CAMARA TRASERA + GRAFIPLOT EN LA PC
-
-PRIMERO EN LA PC
-1. Conecta la PC por cable Ethernet a tu router. Mantiene acceso a internet.
-2. Extrae TODO el ZIP portable y abre INICIAR_GRAFIPLOT.bat.
-3. El proyecto CUENTAS y su clave publica ya vienen configurados.
-4. Entra con tu correo de Grafiplot y la contrasena de ese usuario.
-   La contrasena se escribe solo en la PC. El mismo navegador conserva la sesion
-   mientras siga valida. Abre siempre http://127.0.0.1:8765/ sin modo incognito.
-5. En el sistema abre el panel: Conectar APK por Wi-Fi - camara trasera.
-   Anota Direccion para la APK (http://IP-DE-TU-PC:8765) y Clave de conexion.
-6. Deja la consola y la pagina de Grafiplot abiertas. La PC no debe suspenderse.
-
-AHORA EN EL CELULAR ANDROID
-1. Conecta el celular al Wi-Fi del MISMO router al que esta conectada la PC.
-2. Copia lector-wifi/QRClientes-Camara-Trasera.apk al celular por cable USB,
-   o descarga el ZIP en el celular, extraelo y abre ese archivo APK.
-3. Toca Instalar. Si Android lo pide, permite instalar desde la aplicacion
-   donde abriste la APK. Abre QR Clientes cuando termine.
-4. En Direccion que muestra el programa de PC, escribe la direccion del
-   panel Wi-Fi de la PC, completa con http:// y :8765.
-5. En Clave de conexion de la PC, copia la clave del mismo panel Wi-Fi.
-6. Toca Probar conexion. Debe aparecer Conexion correcta.
-7. Toca Iniciar lector en segundo plano. Permite el uso de la camara y las
-   notificaciones. Debe aparecer la notificacion de camara QR activa.
-8. Acerca un QR a la CAMARA TRASERA con buena iluminacion. El QR debe
-   contener el codigo de un trabajo guardado en Grafiplot, por ejemplo 001.
-9. La PC abre una ventana dentro del navegador con cliente, detalle, ubicacion
-   y deuda. Acepta o cierra esa consulta antes de ver la siguiente.
-10. Puedes cambiar de aplicacion en el celular. En Ajustes de bateria de QR
-    Clientes selecciona Sin restricciones para reducir interrupciones.
-11. Prueba el bloqueo de pantalla. Si tu modelo deja de leer al bloquear,
-    abre QR Clientes y toca Pantalla negra. Esa opcion mantiene la pantalla
-    encendida con brillo minimo; toca la pantalla para volver al menu.
-12. Para terminar, toca Detener lector en la app o Detener en la notificacion.
-    Tras reiniciar o forzar detencion del celular, inicia el lector de nuevo.
-
-SI LA PRUEBA DE CONEXION FALLA
-- Comprueba que la PC tiene abierto INICIAR_GRAFIPLOT.bat.
-- Revisa la IP: la Direccion para la APK es la IP local de la PC, no 127.0.0.1.
-- Permite Python o TCP 8765 en la red PRIVADA del Firewall de Windows.
-- Evita el Wi-Fi de invitados o el aislamiento de dispositivos del router.
-- Si aparece Clave incorrecta, vuelve a copiar la clave del panel Wi-Fi.
-
-PARA UNA PRUEBA DE DEUDA DE S/ 15
-Guarda en Grafiplot un trabajo con total S/ 20 y pago a cuenta S/ 5,
-asignado a un codigo libre. Escanea el QR de ese codigo. Debe mostrar S/ 15.
-No se crean fichas ni pagos automaticamente al leer un QR.
-
-IMPORTANTE
-La PC consulta y guarda en Supabase y necesita internet. La APK envia los QR
-por tu red local. Mantener el lector todo el dia y con pantalla bloqueada
-requiere probar bateria, temperatura y restricciones de tu modelo Android.
+SI NO APARECE NADA EN WINDOWS
+Pulsa Enviar QR de prueba 001. Si la APK dice Sin conexión, revisa URL/clave/Wi-Fi/firewall.
+Si dice Prueba 001 enviada a PC, deja Grafiplot abierto con sesión iniciada y revisa sus lecturas pendientes.
+Si la prueba funciona pero la cámara no, revisa Último QR en la APK: si dice ninguno detectado, aleja el QR a 15–25 cm e ilumínalo.
