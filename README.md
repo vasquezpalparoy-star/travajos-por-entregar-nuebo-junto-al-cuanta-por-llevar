@@ -8,7 +8,7 @@ La APK utiliza la **cámara trasera** en segundo plano. El receptor Windows abre
 
 - Inicia la PC con `INICIAR_GRAFIPLOT.bat`. El paquete portable incluye Python; al descargar solo el codigo, el iniciador lo prepara automaticamente si hace falta.
 - Instala `lector-wifi/QRClientes-Camara-Trasera.apk` en Android 10 o superior.
-- Inicia sesión en la página local con tu proyecto y cuenta Supabase existentes.
+- El proyecto CUENTAS está preconfigurado. Inicia sesión con tu cuenta Grafiplot una vez; el navegador conserva la sesión mientras siga válida.
 - Copia dirección y clave del panel **Conectar APK por Wi-Fi** a la APK.
 - Pulsa **Iniciar lector en segundo plano** y presenta el QR a la cámara trasera.
 

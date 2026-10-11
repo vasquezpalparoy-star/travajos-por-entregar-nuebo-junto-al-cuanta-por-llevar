@@ -1,0 +1,53 @@
+ANDROID: CAMARA TRASERA + GRAFIPLOT EN LA PC
+
+PRIMERO EN LA PC
+1. Conecta la PC por cable Ethernet a tu router. Mantiene acceso a internet.
+2. Extrae TODO el ZIP portable y abre INICIAR_GRAFIPLOT.bat.
+3. El proyecto CUENTAS y su clave publica ya vienen configurados.
+4. Entra con tu correo de Grafiplot y la contrasena de ese usuario.
+   La contrasena se escribe solo en la PC. El mismo navegador conserva la sesion
+   mientras siga valida. Abre siempre http://127.0.0.1:8765/ sin modo incognito.
+5. En el sistema abre el panel: Conectar APK por Wi-Fi - camara trasera.
+   Anota Direccion para la APK (http://IP-DE-TU-PC:8765) y Clave de conexion.
+6. Deja la consola y la pagina de Grafiplot abiertas. La PC no debe suspenderse.
+
+AHORA EN EL CELULAR ANDROID
+1. Conecta el celular al Wi-Fi del MISMO router al que esta conectada la PC.
+2. Copia lector-wifi/QRClientes-Camara-Trasera.apk al celular por cable USB,
+   o descarga el ZIP en el celular, extraelo y abre ese archivo APK.
+3. Toca Instalar. Si Android lo pide, permite instalar desde la aplicacion
+   donde abriste la APK. Abre QR Clientes cuando termine.
+4. En Direccion que muestra el programa de PC, escribe la direccion del
+   panel Wi-Fi de la PC, completa con http:// y :8765.
+5. En Clave de conexion de la PC, copia la clave del mismo panel Wi-Fi.
+6. Toca Probar conexion. Debe aparecer Conexion correcta.
+7. Toca Iniciar lector en segundo plano. Permite el uso de la camara y las
+   notificaciones. Debe aparecer la notificacion de camara QR activa.
+8. Acerca un QR a la CAMARA TRASERA con buena iluminacion. El QR debe
+   contener el codigo de un trabajo guardado en Grafiplot, por ejemplo 001.
+9. La PC abre una ventana dentro del navegador con cliente, detalle, ubicacion
+   y deuda. Acepta o cierra esa consulta antes de ver la siguiente.
+10. Puedes cambiar de aplicacion en el celular. En Ajustes de bateria de QR
+    Clientes selecciona Sin restricciones para reducir interrupciones.
+11. Prueba el bloqueo de pantalla. Si tu modelo deja de leer al bloquear,
+    abre QR Clientes y toca Pantalla negra. Esa opcion mantiene la pantalla
+    encendida con brillo minimo; toca la pantalla para volver al menu.
+12. Para terminar, toca Detener lector en la app o Detener en la notificacion.
+    Tras reiniciar o forzar detencion del celular, inicia el lector de nuevo.
+
+SI LA PRUEBA DE CONEXION FALLA
+- Comprueba que la PC tiene abierto INICIAR_GRAFIPLOT.bat.
+- Revisa la IP: la Direccion para la APK es la IP local de la PC, no 127.0.0.1.
+- Permite Python o TCP 8765 en la red PRIVADA del Firewall de Windows.
+- Evita el Wi-Fi de invitados o el aislamiento de dispositivos del router.
+- Si aparece Clave incorrecta, vuelve a copiar la clave del panel Wi-Fi.
+
+PARA UNA PRUEBA DE DEUDA DE S/ 15
+Guarda en Grafiplot un trabajo con total S/ 20 y pago a cuenta S/ 5,
+asignado a un codigo libre. Escanea el QR de ese codigo. Debe mostrar S/ 15.
+No se crean fichas ni pagos automaticamente al leer un QR.
+
+IMPORTANTE
+La PC consulta y guarda en Supabase y necesita internet. La APK envia los QR
+por tu red local. Mantener el lector todo el dia y con pantalla bloqueada
+requiere probar bateria, temperatura y restricciones de tu modelo Android.

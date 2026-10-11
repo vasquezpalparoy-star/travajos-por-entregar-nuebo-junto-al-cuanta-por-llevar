@@ -301,10 +301,13 @@
     <div id="cloud-gate" class="fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3">
             <h2 class="text-xl font-black text-slate-900">Conectar Grafiplot</h2>
-            <p class="text-sm text-slate-600">Usa el mismo proyecto y la misma cuenta Supabase del programa para PC.</p>
+            <p class="text-sm text-slate-600">La conexión a CUENTAS ya está configurada. Entra con tu usuario de Grafiplot; este navegador recordará tu sesión.</p>
             <form id="cloud-form" class="space-y-3">
-                <input id="cloud-url" type="url" required placeholder="https://tu-proyecto.supabase.co" class="w-full border rounded-xl p-3 text-sm">
-                <input id="cloud-key" type="text" required placeholder="Clave publishable / anon" class="w-full border rounded-xl p-3 text-sm">
+                <details class="text-xs text-slate-500">
+                    <summary class="cursor-pointer">Configuración del proyecto (ya preparada)</summary>
+                    <label class="block mt-2">URL del proyecto<input id="cloud-url" type="url" required placeholder="https://tu-proyecto.supabase.co" class="mt-1 w-full border rounded-xl p-3 text-sm"></label>
+                    <label class="block mt-2">Clave pública<input id="cloud-key" type="text" required placeholder="Clave publishable / anon" class="mt-1 w-full border rounded-xl p-3 text-sm"></label>
+                </details>
                 <input id="cloud-email" type="email" required placeholder="Correo" autocomplete="username" class="w-full border rounded-xl p-3 text-sm">
                 <input id="cloud-password" type="password" required placeholder="Contraseña" autocomplete="current-password" class="w-full border rounded-xl p-3 text-sm">
                 <p id="cloud-message" class="text-sm text-red-600" role="alert"></p>
@@ -325,8 +328,14 @@
 
         const gate = document.getElementById('cloud-gate');
         const cloudMessage = document.getElementById('cloud-message');
-        document.getElementById('cloud-url').value = localStorage.getItem('grafiplot_supabase_url') || '';
-        document.getElementById('cloud-key').value = localStorage.getItem('grafiplot_supabase_key') || '';
+        const DEFAULT_PROJECT_URL = 'https://pdszypigdjnfnbldecah.supabase.co';
+        const DEFAULT_PUBLIC_KEY = 'sb_publishable_7qEw0IPoItW_hXHZVH_HAA_YR419f1J';
+        document.getElementById('cloud-url').value = localStorage.getItem('grafiplot_supabase_url') || DEFAULT_PROJECT_URL;
+        document.getElementById('cloud-key').value = localStorage.getItem('grafiplot_supabase_key') || DEFAULT_PUBLIC_KEY;
+        document.getElementById('cloud-email').value = localStorage.getItem('grafiplot_email') || '';
+        const createCloudClient = (url, key) => window.supabase.createClient(url, key, {
+            auth: {persistSession:true, autoRefreshToken:true}
+        });
 
         function calcularCambio() {
             const precio = parseFloat(document.getElementById('reg-precio').value) || 0;
@@ -374,7 +383,7 @@
             const key = document.getElementById('cloud-key').value.trim();
             if (!url || !key) { gate.classList.remove('hidden'); return; }
             try {
-                api = window.supabase.createClient(url, key);
+                api = createCloudClient(url, key);
                 const {data:{session}, error} = await api.auth.getSession();
                 if (error) throw error;
                 owner = session?.user || null;
@@ -383,7 +392,7 @@
                 api.auth.onAuthStateChange((_event, sessionNow) => {
                     owner = sessionNow?.user || null;
                     gate.classList.toggle('hidden', !!owner);
-                    if (owner) refreshRecords(); else { records = []; handleSearch(); }
+                    if (owner) setTimeout(refreshRecords, 0); else { records = []; handleSearch(); }
                 });
                 setInterval(refreshRecords, 6000);
                 window.addEventListener('focus', refreshRecords);
@@ -402,7 +411,7 @@
             try {
                 if (!url.startsWith('https://')) throw new Error('La URL debe comenzar con https://');
                 const changed = !api || url !== localStorage.getItem('grafiplot_supabase_url') || key !== localStorage.getItem('grafiplot_supabase_key');
-                if (changed) api = window.supabase.createClient(url, key);
+                if (changed) api = createCloudClient(url, key);
                 const {data, error} = await api.auth.signInWithPassword({
                     email:document.getElementById('cloud-email').value.trim(),
                     password:document.getElementById('cloud-password').value
@@ -411,6 +420,7 @@
                 owner = data.user;
                 localStorage.setItem('grafiplot_supabase_url', url);
                 localStorage.setItem('grafiplot_supabase_key', key);
+                localStorage.setItem('grafiplot_email', document.getElementById('cloud-email').value.trim());
                 document.getElementById('cloud-password').value = '';
                 gate.classList.add('hidden');
                 await refreshRecords();
