@@ -8,3 +8,7 @@ local.properties
 .gradle/
 build/
 *.apk.idsig
+
+lector-wifi/runtime/
+lector-wifi/runtime-preparando/
+lector-wifi/python-portable.zip

@@ -5,8 +5,8 @@ La APK lee QR con la **cámara trasera**, incluso al cambiar de aplicación, y e
 ## Instalación
 
 1. Descarga y extrae **todo** el proyecto de la rama `integracion-qr-camara-trasera` (o el ZIP entregado). El receptor necesita `index.html` y `qr-wifi.mjs` en la carpeta superior.
-2. En Windows instala Python 3.12 o superior, incluyendo el lanzador `py`. El receptor no necesita paquetes adicionales.
-3. Abre `lector-wifi/INICIAR_WINDOWS.bat`. Se abre Grafiplot en `http://127.0.0.1:8765/`. Deja la consola y esa pestaña abiertas. Inicia sesión con **el mismo proyecto Supabase, clave pública y cuenta** que utilizas actualmente. El navegador local puede pedir esta configuración nuevamente porque es una dirección distinta de GitHub Pages.
+2. En el paquete portable entregado, Python ya viene incluido: no necesitas instalarlo. Si descargas solo el codigo de GitHub y no tienes Python, el iniciador descarga y verifica Python portable oficial en la primera ejecucion. Necesita internet para esa descarga. Windows 8.1 o superior, en PC Intel/AMD de 32 o 64 bits.
+3. Extrae **todo** el ZIP y abre `INICIAR_GRAFIPLOT.bat` en la carpeta principal (tambien sirve `lector-wifi/INICIAR_WINDOWS.bat`). Se abre Grafiplot en `http://127.0.0.1:8765/`. Deja la consola y esa pestaña abiertas. Inicia sesión con **el mismo proyecto Supabase, clave pública y cuenta** que utilizas actualmente. El navegador local puede pedir esta configuración nuevamente porque es una dirección distinta de GitHub Pages.
 4. En el panel **Conectar APK por Wi-Fi · cámara trasera**, despliega la dirección y la clave de conexión.
 5. Instala `lector-wifi/QRClientes-Camara-Trasera.apk` en Android 10 o superior. Puedes actualizar la APK anterior sin desinstalarla; ambas versiones entregadas llevan la misma firma. Permite instalar desde la fuente donde abriste el archivo.
 6. Copia dirección y clave en la APK. Pulsa **Probar conexión** y después **Iniciar lector en segundo plano**. Concede cámara y notificaciones.
@@ -51,3 +51,7 @@ Se verifica HTTP, persistencia, autenticación, restricción de la interfaz a la
 
 ZXing Core 3.5.3: https://github.com/zxing/zxing (Apache-2.0).
 Android servicios de cámara: https://developer.android.com/develop/background-work/services/fgs/service-types.
+
+## Si no inicia en Windows
+
+Abre `INICIAR_GRAFIPLOT.bat` desde la carpeta extraida, no desde dentro del ZIP. El iniciador busca primero el Python portable incluido, luego `py` y `python`. Si falta Python, prepara una copia portable sin cambiar la instalacion del sistema. Si hay un error, la consola permanece abierta con su causa. Si la consola indica que el receptor esta activo pero no se abre el navegador, entra manualmente a http://127.0.0.1:8765/.
