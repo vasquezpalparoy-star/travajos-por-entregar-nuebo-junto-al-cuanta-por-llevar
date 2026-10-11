@@ -1,0 +1,9 @@
+APK 1.7 - CÁMARA CORREGIDA
+
+Actualiza solo la APK. En Windows puedes conservar la versión 1.6.
+La vista de cámara conserva las proporciones: puede mostrar márgenes negros.
+Se eliminó la rotación añadida por la app; Android orienta la vista según la cámara y la pantalla.
+Instala sin desinstalar la anterior y conserva URL/clave. Pulsa Abrir cámara y escanear.
+Siguen disponibles Seguir en segundo plano y Enviar QR de prueba 001.
+Verifica primero en vertical y luego en horizontal, apuntando a un QR cuadrado: debe verse cuadrado.
+La geometría se comprobó en 64 combinaciones; la imagen real requiere prueba en tu teléfono.

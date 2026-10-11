@@ -96,6 +96,17 @@
                 </button>
             </div>
 
+            <details class="mb-3 rounded-xl border border-fuchsia-200 bg-white p-3 shrink-0 text-xs">
+                <summary class="cursor-pointer font-bold text-fuchsia-800">📱 Conectar APK por Wi-Fi · cámara trasera</summary>
+                <p id="wifi-help" class="mt-2 text-gray-600">En la PC, ejecuta lector-wifi/INICIAR_WINDOWS.bat y abre la página que muestra. Inicia sesión con tu proyecto y cuenta Supabase.</p>
+                <div id="wifi-connection" class="hidden mt-2 space-y-2">
+                    <label class="block">Dirección para la APK<input id="wifi-url" readonly class="mt-1 w-full border rounded-lg p-2 font-mono bg-gray-50"></label>
+                    <label class="block">Clave de conexión<input id="wifi-token" readonly class="mt-1 w-full border rounded-lg p-2 font-mono bg-gray-50"></label>
+                    <p>PC por Ethernet o Wi-Fi al router y Android por Wi-Fi al mismo router. Copia estos datos en la APK e inicia el lector. Mantén esta página abierta en la PC.</p>
+                </div>
+                <p id="wifi-status" role="status" class="mt-2 font-semibold text-fuchsia-700"></p>
+            </details>
+
             <!-- Contenedor del Escáner QR Cuadrado (Ubicado en la parte superior) -->
             <div id="scanner-container" class="hidden w-full max-w-xs sm:max-w-sm mx-auto mb-3 bg-white border-2 border-fuchsia-300 rounded-2xl p-2.5 shrink-0 shadow-lg">
                 <div class="relative w-full aspect-square rounded-xl overflow-hidden bg-black shadow-inner border border-fuchsia-200 flex items-center justify-center">
@@ -276,7 +287,7 @@
 
     <!-- Modal Resultado Escaneo / Código Libre -->
     <div id="scan-result-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 transform scale-95 transition-transform relative" id="scan-result-content">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 max-h-[90vh] overflow-y-auto transform scale-95 transition-transform relative" id="scan-result-content">
             <!-- Contenido dinámico inyectado por JS -->
         </div>
     </div>
@@ -290,10 +301,14 @@
     <div id="cloud-gate" class="fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3">
             <h2 class="text-xl font-black text-slate-900">Conectar Grafiplot</h2>
-            <p class="text-sm text-slate-600">Usa el mismo proyecto y la misma cuenta Supabase del programa para PC.</p>
+            <p class="text-xs font-bold text-green-700">VERSIÓN 1.6 · CUENTAS CONFIGURADO</p>
+            <p class="text-sm text-slate-600">La conexión a CUENTAS ya está configurada. Entra con tu usuario de Grafiplot; este navegador recordará tu sesión.</p>
             <form id="cloud-form" class="space-y-3">
-                <input id="cloud-url" type="url" required placeholder="https://tu-proyecto.supabase.co" class="w-full border rounded-xl p-3 text-sm">
-                <input id="cloud-key" type="text" required placeholder="Clave publishable / anon" class="w-full border rounded-xl p-3 text-sm">
+                <details class="text-xs text-slate-500">
+                    <summary class="cursor-pointer">Configuración del proyecto (ya preparada)</summary>
+                    <label class="block mt-2">URL del proyecto<input id="cloud-url" value="https://pdszypigdjnfnbldecah.supabase.co" type="url" required placeholder="https://tu-proyecto.supabase.co" class="mt-1 w-full border rounded-xl p-3 text-sm"></label>
+                    <label class="block mt-2">Clave pública<input id="cloud-key" value="sb_publishable_7qEw0IPoItW_hXHZVH_HAA_YR419f1J" type="text" required placeholder="Clave publishable / anon" class="mt-1 w-full border rounded-xl p-3 text-sm"></label>
+                </details>
                 <input id="cloud-email" type="email" required placeholder="Correo" autocomplete="username" class="w-full border rounded-xl p-3 text-sm">
                 <input id="cloud-password" type="password" required placeholder="Contraseña" autocomplete="current-password" class="w-full border rounded-xl p-3 text-sm">
                 <p id="cloud-message" class="text-sm text-red-600" role="alert"></p>
@@ -303,6 +318,7 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script type="module">
+        import {findCloudRecord, debtInSoles, startWifiReceiver} from "./qr-wifi.mjs";
         let api = null;
         let owner = null;
         let records = [];
@@ -313,8 +329,14 @@
 
         const gate = document.getElementById('cloud-gate');
         const cloudMessage = document.getElementById('cloud-message');
-        document.getElementById('cloud-url').value = localStorage.getItem('grafiplot_supabase_url') || '';
-        document.getElementById('cloud-key').value = localStorage.getItem('grafiplot_supabase_key') || '';
+        const DEFAULT_PROJECT_URL = 'https://pdszypigdjnfnbldecah.supabase.co';
+        const DEFAULT_PUBLIC_KEY = 'sb_publishable_7qEw0IPoItW_hXHZVH_HAA_YR419f1J';
+        document.getElementById('cloud-url').value = DEFAULT_PROJECT_URL;
+        document.getElementById('cloud-key').value = DEFAULT_PUBLIC_KEY;
+        document.getElementById('cloud-email').value = localStorage.getItem('grafiplot_email') || '';
+        const createCloudClient = (url, key) => window.supabase.createClient(url, key, {
+            auth: {persistSession:true, autoRefreshToken:true}
+        });
 
         function calcularCambio() {
             const precio = parseFloat(document.getElementById('reg-precio').value) || 0;
@@ -362,7 +384,7 @@
             const key = document.getElementById('cloud-key').value.trim();
             if (!url || !key) { gate.classList.remove('hidden'); return; }
             try {
-                api = window.supabase.createClient(url, key);
+                api = createCloudClient(url, key);
                 const {data:{session}, error} = await api.auth.getSession();
                 if (error) throw error;
                 owner = session?.user || null;
@@ -371,7 +393,7 @@
                 api.auth.onAuthStateChange((_event, sessionNow) => {
                     owner = sessionNow?.user || null;
                     gate.classList.toggle('hidden', !!owner);
-                    if (owner) refreshRecords(); else { records = []; handleSearch(); }
+                    if (owner) setTimeout(refreshRecords, 0); else { records = []; handleSearch(); }
                 });
                 setInterval(refreshRecords, 6000);
                 window.addEventListener('focus', refreshRecords);
@@ -390,7 +412,7 @@
             try {
                 if (!url.startsWith('https://')) throw new Error('La URL debe comenzar con https://');
                 const changed = !api || url !== localStorage.getItem('grafiplot_supabase_url') || key !== localStorage.getItem('grafiplot_supabase_key');
-                if (changed) api = window.supabase.createClient(url, key);
+                if (changed) api = createCloudClient(url, key);
                 const {data, error} = await api.auth.signInWithPassword({
                     email:document.getElementById('cloud-email').value.trim(),
                     password:document.getElementById('cloud-password').value
@@ -399,6 +421,7 @@
                 owner = data.user;
                 localStorage.setItem('grafiplot_supabase_url', url);
                 localStorage.setItem('grafiplot_supabase_key', key);
+                localStorage.setItem('grafiplot_email', document.getElementById('cloud-email').value.trim());
                 document.getElementById('cloud-password').value = '';
                 gate.classList.add('hidden');
                 await refreshRecords();
@@ -949,12 +972,14 @@
         window.showClearModal = () => document.getElementById('clear-modal').classList.remove('hidden');
         window.hideClearModal = () => document.getElementById('clear-modal').classList.add('hidden');
         
-        window.showScanResultModal = function(decodedText) {
+        window.showScanResultModal = function(decodedText, resolvedRecord) {
             const rawText = (decodedText || '').trim();
             
-            let record = records.find(r => r.codigo && (r.codigo === rawText || r.codigo.toLowerCase() === rawText.toLowerCase()));
+            let record = resolvedRecord === undefined
+                ? records.find(r => r.codigo && (r.codigo === rawText || r.codigo.toLowerCase() === rawText.toLowerCase()))
+                : resolvedRecord;
             
-            if (!record && !isNaN(rawText) && rawText.length > 0) {
+            if (resolvedRecord === undefined && !record && /^\d{1,3}$/.test(rawText)) {
                 const padded = String(parseInt(rawText, 10)).padStart(3, '0');
                 record = records.find(r => r.codigo === padded);
             }
@@ -979,6 +1004,9 @@
                         </div>
                     </div>
                     
+                    <div class="mb-4 text-2xl font-black ${Number(debtInSoles(record.precio, record.pago)) > 0 ? 'text-red-600' : 'text-green-700'}">
+                        ${Number(debtInSoles(record.precio, record.pago)) > 0 ? 'Debe S/ ' + debtInSoles(record.precio, record.pago) : 'Sin deuda pendiente'}
+                    </div>
                     <div class="bg-gray-50 rounded-xl p-3 border border-gray-100 space-y-2 mb-4 text-xs">
                         <div>
                             <div class="text-[10px] font-bold text-gray-500 uppercase">Cliente</div>
@@ -1044,7 +1072,10 @@
             document.getElementById('scan-result-modal').classList.remove('hidden');
         };
 
-        window.hideScanResultModal = () => document.getElementById('scan-result-modal').classList.add('hidden');
+        window.hideScanResultModal = () => {
+            document.getElementById('scan-result-modal').classList.add('hidden');
+            document.title = 'Sistema de Control - Grafiplot';
+        };
 
         window.executeClearData = async function() {
             if (!owner || !api) return;
@@ -1234,8 +1265,48 @@
             }
         };
 
+        async function connectWifiReceiver() {
+            if (!['127.0.0.1', 'localhost'].includes(location.hostname)) return;
+            const status = document.getElementById('wifi-status');
+            try {
+                const response = await fetch('/connection', {credentials:'same-origin', cache:'no-store', signal:AbortSignal.timeout(5000)});
+                if (!response.ok) return;
+                const connection = await response.json();
+                if (!connection.url || !connection.token) return;
+                document.getElementById('wifi-url').value = connection.url;
+                document.getElementById('wifi-token').value = connection.token;
+                document.getElementById('wifi-connection').classList.remove('hidden');
+                document.getElementById('wifi-help').textContent = 'Cámara trasera en segundo plano. La consulta y el guardado usan tu base Grafiplot.';
+                startWifiReceiver({
+                    canRead: () => !!api && !!owner,
+                    isModalOpen: () => !document.getElementById('scan-result-modal').classList.contains('hidden'),
+                    status: text => { status.textContent = text; },
+                    closeModal: () => hideScanResultModal(),
+                    subscribe: wake => { const source = new EventSource("/live"); source.onmessage = wake; return () => source.close(); },
+                    show: async (code, evento) => {
+                        const scannedOwner = owner.id;
+                        const row = await findCloudRecord(api, scannedOwner, code);
+                        if (owner?.id !== scannedOwner) return false;
+                        const record = row ? toRecord(row) : null;
+                        if (record) {
+                            const index = records.findIndex(r => r.id === record.id);
+                            if (index >= 0) records[index] = record; else records.push(record);
+                        }
+                        showScanResultModal(code, record);
+                        const text = record
+                            ? `Código: ${record.codigo}\nCliente: ${record.nombre}\nDebe S/ ${debtInSoles(record.precio, record.pago)}\n\nDetalle: ${record.descripcion || ''}\nUbicación: ${record.ubicacion || ''}\nTeléfono: ${record.celular || ''}`
+                            : `Código: ${code}\nNo hay un trabajo pendiente con este código.`;
+                        const popupResponse = await fetch('/popup', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({evento,text:text.slice(0,3000),details:{codigo:String(record?.codigo || code).slice(0,256),nombre:String(record?.nombre || 'Sin trabajo pendiente').slice(0,200),deuda:record?debtInSoles(record.precio,record.pago):'',descripcion:String(record?.descripcion || 'No hay un trabajo pendiente con este código.').slice(0,1200),ubicacion:String(record?.ubicacion || '').slice(0,100),telefono:String(record?.celular || '').slice(0,64)}}),signal:AbortSignal.timeout(5000)});
+                        if (!popupResponse.ok) status.textContent = 'El resultado está en Grafiplot; no se pudo mostrar la ventana Windows.';
+                        document.title = 'QR recibido · Grafiplot';
+                    }
+                });
+            } catch (error) { status.textContent = 'Abre el sistema desde INICIAR_WINDOWS.bat para conectar la APK.'; }
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             initApp();
+            connectWifiReceiver();
             
             const inpPrecio = document.getElementById('reg-precio');
             const inpPago = document.getElementById('reg-pago');
