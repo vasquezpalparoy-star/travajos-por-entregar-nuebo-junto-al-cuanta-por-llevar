@@ -5,6 +5,7 @@ import json
 import os
 import secrets
 import socket
+import sys
 import sqlite3
 import threading
 import time
@@ -12,6 +13,8 @@ import webbrowser
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+# Embedded Python isolates sys.path; include this trusted application's folder.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ventana import Ventana
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -153,7 +156,7 @@ def main():
     try: server.popup=Ventana()
     except OSError as e: print('No se pudo abrir ventana Windows:',e)
     url=f'http://{server.local_host()}/'
-    print('Grafiplot 1.4 - CUENTAS configurado. Mantén esta ventana abierta.');print('Carpeta del sistema:',ROOT);print('Abre en esta PC:',url)
+    print('Grafiplot 1.4.1 - CUENTAS configurado. Mantén esta ventana abierta.');print('Carpeta del sistema:',ROOT);print('Abre en esta PC:',url)
     print('Inicia sesión con el MISMO proyecto y cuenta Supabase de tu sistema.');print('Detener: Ctrl+C')
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()

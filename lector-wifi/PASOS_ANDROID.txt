@@ -1,3 +1,7 @@
+CORRECCIÓN WINDOWS 1.4.1
+Cierra la consola anterior. Extrae este ZIP en una carpeta nueva y abre INICIAR_GRAFIPLOT.bat.
+La APK es la misma versión 1.4: si ya la actualizaste, no hace falta instalarla otra vez.
+
 NUEVO: CÁMARA FLOTANTE Y VENTANA WINDOWS
 
 1. Cierra el receptor anterior. Extrae todo el ZIP nuevo y abre INICIAR_GRAFIPLOT.bat.
