@@ -79,3 +79,6 @@ Envío inmediato al detectar QR, análisis cada 180 ms como máximo y lectura de
 ## APK 1.7
 
 Reemplaza TextureView y su matriz manual por SurfaceView con proporciones conservadas. Android gestiona la rotación del buffer; la app calcula únicamente el ajuste completo de la imagen según sensor y pantalla, con márgenes negros. Se verifican 64 combinaciones de orientación y tamaño de vista y dos geometrías de referencia. No se ha probado la imagen en hardware Android real. El receptor Windows sigue en versión 1.6.
+
+
+Versión 1.8: actualizar PC y APK. Ficha completa, registro nativo cuando no hay trabajo pendiente, último QR reemplaza la ficha abierta, reenvío manual y envío continuo de la cola. Consulta PASOS_ANDROID.txt.

@@ -12,6 +12,8 @@ class Ventana:
         self.path = Path(self.directory.name) / 'ventana.json'
         self.closed_path = Path(str(self.path) + '.closed')
         self.event = None
+        self.data = {'visible':False}
+        self.action_path = Path(str(self.path) + '.action')
         self.process = None
         self.write({'visible': False})
         if os.name == 'nt':
@@ -21,6 +23,7 @@ class Ventana:
                 '-DataPath', str(self.path)
             ], creationflags=subprocess.CREATE_NO_WINDOW)
     def write(self, data):
+        self.data = dict(data)
         data['revision'] = secrets.token_hex(8)
         staging = self.path.with_suffix('.tmp')
         staging.write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8')
@@ -28,7 +31,22 @@ class Ventana:
     def show(self, event, text, details=None):
         self.event = event
         self.closed_path.unlink(missing_ok=True)
+        self.action_path.unlink(missing_ok=True)
         self.write({'visible':True,'evento':event,'text':text,'details':details})
+    def editing(self):
+        return Path(str(self.path)+'.editing').exists()
+    def action(self):
+        try:
+            if self.action_path.stat().st_size > 8192:return None
+            obj=json.loads(self.action_path.read_text(encoding='utf-8-sig'))
+            if isinstance(obj,dict) and obj.get('evento')==self.event:return obj
+        except (OSError,ValueError):pass
+        return None
+    def action_ack(self, action_id, message):
+        action=self.action()
+        if not action or action.get('id')!=action_id:raise ValueError('Acción no pendiente')
+        self.action_path.unlink(missing_ok=True)
+        data=dict(self.data);data['status']=message;self.write(data)
     def closed(self, event):
         try:return self.closed_path.read_text(encoding='utf-8') == event
         except OSError:return False

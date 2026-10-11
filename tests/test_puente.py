@@ -16,6 +16,26 @@ class BridgeTests(unittest.TestCase):
   if host:headers['Host']=host
   req=urllib.request.Request(self.url+path,data=json.dumps(body).encode() if body is not None else None,headers=headers)
   with urllib.request.urlopen(req,timeout=5) as r:return r.status,r.read(),dict(r.headers)
+ def test_native_registration_action_is_local_and_acknowledged(self):
+  popup=Ventana();self.server.popup=popup
+  try:
+   self.request('/scan',{'codigo':'ABC','evento':'new'})
+   self.request('/popup',{'evento':'new','text':'Sin registro','details':{'codigo':'ABC','deuda':''}},browser=True)
+   action={'evento':'new','id':'12345678-1234-1234-1234-123456789012','data':{'codigo':'ABC','nombre':'Ana'}}
+   popup.action_path.write_text(json.dumps(action),encoding='utf-8')
+   self.assertEqual(json.loads(self.request('/popup-state',browser=True)[1])['action'],action)
+   with self.assertRaises(urllib.error.HTTPError):self.request('/popup-action-ack',{'evento':'new','id':action['id'],'message':'error'})
+   self.request('/popup-action-ack',{'evento':'new','id':action['id'],'message':'Reintenta'},browser=True)
+   self.assertIsNone(popup.action());self.assertEqual(popup.data['status'],'Reintenta')
+   self.assertEqual(self.data.pendientes()[1],1)
+  finally:popup.close();self.server.popup=None
+ def test_latest_replaces_and_retains_later_arrivals(self):
+  for n in range(25):self.request('/scan',{'codigo':str(n),'evento':'event-'+str(n)})
+  result=json.loads(self.request('/events',browser=True)[1]);self.assertEqual(result['latest']['codigo'],'24')
+  self.request('/popup',{'evento':'event-24','text':'Latest'},browser=True)
+  self.request('/scan',{'codigo':'25','evento':'event-25'})
+  self.request('/ack-before',{'evento':'event-24'},browser=True)
+  events,count=self.data.pendientes();self.assertEqual(count,2);self.assertEqual([e['codigo'] for e in events],['24','25'])
  def test_end_to_end_and_retry(self):
   self.request('/scan',{'codigo':'001','evento':'test-1'});self.request('/scan',{'codigo':'001','evento':'test-1'})
   result=json.loads(self.request('/events',browser=True)[1]);self.assertEqual(result['pendientes'],1);self.assertEqual(result['events'][0]['codigo'],'001')

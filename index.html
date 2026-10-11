@@ -301,7 +301,7 @@
     <div id="cloud-gate" class="fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3">
             <h2 class="text-xl font-black text-slate-900">Conectar Grafiplot</h2>
-            <p class="text-xs font-bold text-green-700">VERSIÓN 1.6 · CUENTAS CONFIGURADO</p>
+            <p class="text-xs font-bold text-green-700">VERSIÓN 1.8 · CUENTAS CONFIGURADO</p>
             <p class="text-sm text-slate-600">La conexión a CUENTAS ya está configurada. Entra con tu usuario de Grafiplot; este navegador recordará tu sesión.</p>
             <form id="cloud-form" class="space-y-3">
                 <details class="text-xs text-slate-500">
@@ -318,7 +318,7 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script type="module">
-        import {findCloudRecord, debtInSoles, startWifiReceiver} from "./qr-wifi.mjs";
+        import {findCloudRecord, debtInSoles, startWifiReceiver, createQrRecord} from "./qr-wifi.mjs";
         let api = null;
         let owner = null;
         let records = [];
@@ -643,7 +643,7 @@
         window.assignCodeToNewRecord = function(code) {
             hideScanResultModal();
             
-            let targetCode = code.trim();
+            let targetCode = code.trim().slice(0,256);
             if (!isNaN(targetCode) && targetCode.length > 0) {
                 targetCode = String(parseInt(targetCode, 10)).padStart(3, '0');
             }
@@ -1029,11 +1029,16 @@
                         <div class="border-t border-gray-200 pt-2 mt-2 flex justify-between items-center">
                             <div class="font-black text-gray-800">Total: S/ ${Number(record.precio || 0).toFixed(2)}</div>
                             <div class="font-black text-xs ${(record.pago - record.precio) < 0 ? 'text-red-600 bg-red-100' : 'text-green-600 bg-green-100'} px-2 py-0.5 rounded">
-                                ${(record.pago - record.precio) < 0 ? 'Falta: S/ ' + Math.abs(record.pago - record.precio).toFixed(2) : 'A Cuenta: S/ ' + Number(record.pago || 0).toFixed(2)}
+                                Pagado: S/ ${Number(record.pago || 0).toFixed(2)}
                             </div>
                         </div>
                     </div>
                     
+                    <div class="mb-3 text-xs text-gray-600 break-words">
+                        Estado: ${escapeHtml(record.estado || 'pendiente')} · Fecha: ${escapeHtml(record.createdAt || '')}<br>
+                        Registro: ${escapeHtml(record.id)}<br>
+                        ${(record.items || []).map(i=>`${escapeHtml(i.name || 'Trabajo')} · S/ ${Number(i.price || 0).toFixed(2)} · Cantidad: ${escapeHtml((i.quantities || []).join(', '))}`).join('<br>')}
+                    </div>
                     <div class="grid grid-cols-2 gap-2">
                         <a href="${waLink}" target="_blank" class="${!waNumber ? 'pointer-events-none opacity-50' : ''} w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md text-xs flex justify-center items-center gap-1">
                             💬 Contactar
@@ -1059,7 +1064,7 @@
                         <h3 class="text-lg font-black text-gray-900 mb-1">Código No Registrado</h3>
                         <p class="text-xs text-gray-600 mb-4 font-medium">El código <strong class="font-mono text-blue-700 text-sm bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${escapeHtml(rawText)}</strong> está libre y no tiene ningún cliente asignado.</p>
                         <div class="flex flex-col gap-2">
-                            <button onclick="assignCodeToNewRecord('${/^\d{1,3}$/.test(rawText) ? rawText : ''}')" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3 rounded-xl transition-colors shadow-md text-xs flex justify-center items-center gap-2">
+                            <button onclick="assignCodeToNewRecord(decodeURIComponent('${encodeURIComponent(rawText).replace(/'/g,'%27')}'))" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3 rounded-xl transition-colors shadow-md text-xs flex justify-center items-center gap-2">
                                 ➕ Asignar a Nuevo Registro
                             </button>
                             <button onclick="hideScanResultModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2.5 rounded-xl transition-colors text-xs">
@@ -1277,13 +1282,7 @@
                 document.getElementById('wifi-token').value = connection.token;
                 document.getElementById('wifi-connection').classList.remove('hidden');
                 document.getElementById('wifi-help').textContent = 'Cámara trasera en segundo plano. La consulta y el guardado usan tu base Grafiplot.';
-                startWifiReceiver({
-                    canRead: () => !!api && !!owner,
-                    isModalOpen: () => !document.getElementById('scan-result-modal').classList.contains('hidden'),
-                    status: text => { status.textContent = text; },
-                    closeModal: () => hideScanResultModal(),
-                    subscribe: wake => { const source = new EventSource("/live"); source.onmessage = wake; return () => source.close(); },
-                    show: async (code, evento) => {
+                const showWifiRecord = async (code,evento) => {
                         const scannedOwner = owner.id;
                         const row = await findCloudRecord(api, scannedOwner, code);
                         if (owner?.id !== scannedOwner) return false;
@@ -1296,10 +1295,23 @@
                         const text = record
                             ? `Código: ${record.codigo}\nCliente: ${record.nombre}\nDebe S/ ${debtInSoles(record.precio, record.pago)}\n\nDetalle: ${record.descripcion || ''}\nUbicación: ${record.ubicacion || ''}\nTeléfono: ${record.celular || ''}`
                             : `Código: ${code}\nNo hay un trabajo pendiente con este código.`;
-                        const popupResponse = await fetch('/popup', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({evento,text:text.slice(0,3000),details:{codigo:String(record?.codigo || code).slice(0,256),nombre:String(record?.nombre || 'Sin trabajo pendiente').slice(0,200),deuda:record?debtInSoles(record.precio,record.pago):'',descripcion:String(record?.descripcion || 'No hay un trabajo pendiente con este código.').slice(0,1200),ubicacion:String(record?.ubicacion || '').slice(0,100),telefono:String(record?.celular || '').slice(0,64)}}),signal:AbortSignal.timeout(5000)});
+                        const popupResponse = await fetch('/popup', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({evento,text:text.slice(0,3000),details:{codigo:String(record?.codigo || code).slice(0,256),nombre:String(record?.nombre || 'Sin trabajo pendiente').slice(0,200),deuda:record?debtInSoles(record.precio,record.pago):'',descripcion:String(record?.descripcion || 'No hay un trabajo pendiente con este código.').slice(0,1200),ubicacion:String(record?.ubicacion || '').slice(0,100),telefono:String(record?.celular || '').slice(0,64),completo:record?`Detalle: ${record.descripcion || ''}\n\nHojas: ${record.hojas}\nTotal: S/ ${Number(record.precio).toFixed(2)}\nPagado: S/ ${Number(record.pago).toFixed(2)}\nSaldo: S/ ${debtInSoles(record.precio,record.pago)}\nEstado: ${record.estado || 'pendiente'}\nFecha: ${record.createdAt || ''}\nRegistro: ${record.id}\n\nItems:\n${(record.items || []).map(i=>`${i.name || 'Trabajo'} · S/ ${Number(i.price || 0).toFixed(2)} · Cantidad: ${(i.quantities || []).join(', ')}`).join('\n')}`.slice(0,8000):''}}),signal:AbortSignal.timeout(5000)});
                         if (!popupResponse.ok) status.textContent = 'El resultado está en Grafiplot; no se pudo mostrar la ventana Windows.';
                         document.title = 'QR recibido · Grafiplot';
-                    }
+                };
+                startWifiReceiver({
+                    canRead: () => !!api && !!owner,
+                    isModalOpen: () => !document.getElementById('scan-result-modal').classList.contains('hidden'),
+                    status: text => { status.textContent = text; },
+                    closeModal: () => hideScanResultModal(),
+                    register: async (action,evento) => {
+                        if(action.evento!==evento)throw new Error('Lectura inválida');
+                        await createQrRecord(api,owner.id,action);
+                        await refreshRecords();
+                        await showWifiRecord(action.data.codigo,evento);
+                    },
+                    subscribe: wake => { const source = new EventSource("/live"); source.onmessage = wake; return () => source.close(); },
+                    show: showWifiRecord
                 });
             } catch (error) { status.textContent = 'Abre el sistema desde INICIAR_WINDOWS.bat para conectar la APK.'; }
         }

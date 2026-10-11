@@ -25,7 +25,8 @@ public class ScannerService extends Service {
  Object previewOwner; volatile Surface previewSurface; volatile int previewWidth=640,previewHeight=480,sensorOrientation=90;
  int configuration=0;
  int afMode=CaptureRequest.CONTROL_AF_MODE_OFF;
- MultiFormatReader decoder=new MultiFormatReader();
+ QrDecoder decoder=new QrDecoder();
+ final java.util.concurrent.atomic.AtomicBoolean sending=new java.util.concurrent.atomic.AtomicBoolean();
  public class LocalBinder extends Binder { ScannerService getService(){return ScannerService.this;} }
  final IBinder binder=new LocalBinder();
  public IBinder onBind(Intent i){return binder;}
@@ -33,7 +34,6 @@ public class ScannerService extends Service {
  void detachPreview(Object owner,Runnable done){handler.post(()->{if(previewOwner==owner){previewOwner=null;previewSurface=null;if(!stopped&&camera!=null)setup();}done.run();});}
  public void onCreate(){
   super.onCreate();db=new PendingDb(this);thread=new HandlerThread("QR-Camera");thread.start();handler=new Handler(thread.getLooper());
-  Map<DecodeHintType,Object> hints=new EnumMap<>(DecodeHintType.class);hints.put(DecodeHintType.POSSIBLE_FORMATS,Collections.singletonList(BarcodeFormat.QR_CODE));hints.put(DecodeHintType.TRY_HARDER,true);decoder.setHints(hints);
   NotificationManager manager=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);manager.createNotificationChannel(new NotificationChannel("scanner","Cámara QR activa",NotificationManager.IMPORTANCE_LOW));
   Intent end=new Intent(this,ScannerService.class).setAction("STOP");PendingIntent stop=PendingIntent.getService(this,2,end,PendingIntent.FLAG_IMMUTABLE);
   PendingIntent open=PendingIntent.getActivity(this,1,new Intent(this,MainActivity.class),PendingIntent.FLAG_IMMUTABLE);
@@ -81,29 +81,38 @@ public class ScannerService extends Service {
  void closeCamera(){if(session!=null){session.close();session=null;}if(camera!=null){camera.close();camera=null;}if(images!=null){images.close();images=null;}}
  void analyze(ImageReader r){
   Image image=null;try{
-   image=r.acquireLatestImage();if(image==null)return;long now=SystemClock.elapsedRealtime();if(now-lastFrame<180)return;lastFrame=now;
+   image=r.acquireLatestImage();if(image==null)return;long now=SystemClock.elapsedRealtime();if(now-lastFrame<120)return;lastFrame=now;
    int w=image.getWidth(),h=image.getHeight();Image.Plane plane=image.getPlanes()[0];ByteBuffer buf=plane.getBuffer();int row=plane.getRowStride(),pixel=plane.getPixelStride();byte[] y=new byte[w*h];int offset=buf.position();
-   for(int yy=0;yy<h;yy++)for(int xx=0;xx<w;xx++)y[yy*w+xx]=buf.get(offset+yy*row+xx*pixel);
-   LuminanceSource src=new PlanarYUVLuminanceSource(y,w,h,0,0,w,h,false);Result result;
-   try{result=decoder.decodeWithState(new BinaryBitmap(new HybridBinarizer(src)));}catch(NotFoundException e){decoder.reset();result=decoder.decodeWithState(new BinaryBitmap(new HybridBinarizer(src.invert())));}
+   for(int yy=0;yy<h;yy++){if(pixel==1){buf.position(offset+yy*row);buf.get(y,yy*w,w);}else for(int xx=0;xx<w;xx++)y[yy*w+xx]=buf.get(offset+yy*row+xx*pixel);}
+   Result result=decoder.decode(y,w,h);
    String code=result.getText().trim();if(code.length()==0||code.length()>256){state("QR inválido: usa un código de cliente de hasta 256 caracteres");return;}
    boolean fresh=!code.equals(lastCode)||now-lastSeen>2000;lastSeen=now;
-   if(fresh){if(db.add(code)){lastCode=code;getSharedPreferences("qr",0).edit().putString("ultimoQR",code).apply();state("QR guardado: "+code);if(network!=null&&!stopped)network.execute(()->sendPending());}else{state("Cola llena (1000). Conecta la PC para enviar pendientes.");}}
-  }catch(NotFoundException e){}catch(Exception e){state("Error al leer QR: "+e.getMessage());}finally{decoder.reset();if(image!=null)image.close();}
+   if(fresh){if(db.add(code)){lastCode=code;getSharedPreferences("qr",0).edit().putString("ultimoQR",code).apply();state("QR guardado: "+code);if(network!=null&&!stopped)kickSend();}else{state("Cola llena (1000). Conecta la PC para enviar pendientes.");}}
+  }catch(NotFoundException e){}catch(Exception e){state("Error al leer QR: "+e.getMessage());}finally{if(image!=null)image.close();}
  }
  void connection(String msg){getSharedPreferences("qr",0).edit().putString("conexion",msg).apply();}
+ void resendLast(){
+  String code=getSharedPreferences("qr",0).getString("ultimoQR","");
+  if(code.isEmpty()){state("Todavía no hay un QR detectado. Acércalo a la cámara.");return;}
+  try{if(db.ensurePending(code)){connection("Enviando QR: "+code);kickSend();}else state("Cola llena. Conecta la PC.");}catch(Exception e){state("No se pudo guardar el QR para reenviar");}
+ }
+ void kickSend(){if(network!=null&&!stopped&&sending.compareAndSet(false,true))network.execute(()->{try{sendPending();}finally{sending.set(false);}});}
  void sendPending(){
-  if(stopped)return;
+  for(int batch=0;batch<100&&!stopped;batch++)if(!sendOne())break;
+ }
+ boolean sendOne(){
+  if(stopped)return false;
   HttpURLConnection c=null;
   try{
-   String[] pending=db.first();if(pending==null)return;
+   String[] pending=db.first();if(pending==null)return false;
    String url=getSharedPreferences("qr",0).getString("url","");String key=getSharedPreferences("qr",0).getString("token","");
    c=(HttpURLConnection)new URL(url+"/scan").openConnection();c.setRequestMethod("POST");c.setConnectTimeout(4000);c.setReadTimeout(4000);c.setDoOutput(true);c.setRequestProperty("Authorization","Bearer "+key);c.setRequestProperty("Content-Type","application/json; charset=utf-8");
    byte[] body=new JSONObject().put("codigo",pending[1]).put("evento",pending[0]).toString().getBytes("UTF-8");c.setFixedLengthStreamingMode(body.length);
    try(OutputStream out=c.getOutputStream()){out.write(body);}int status=c.getResponseCode();
-   if(status==200){try(InputStream in=c.getInputStream()){ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] b=new byte[512];int n;while((n=in.read(b))!=-1){if(bytes.size()+n>4096)throw new IOException("Respuesta inválida");bytes.write(b,0,n);}JSONObject result=new JSONObject(bytes.toString("UTF-8"));if(!result.optBoolean("ok"))throw new IOException("Respuesta inválida");}db.remove(pending[0]);connection("Enviado a PC: "+pending[1]);}
+   if(status==200){try(InputStream in=c.getInputStream()){ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] b=new byte[512];int n;while((n=in.read(b))!=-1){if(bytes.size()+n>4096)throw new IOException("Respuesta inválida");bytes.write(b,0,n);}JSONObject result=new JSONObject(bytes.toString("UTF-8"));if(!result.optBoolean("ok"))throw new IOException("Respuesta inválida");}db.remove(pending[0]);connection("Enviado a PC: "+pending[1]+" · Pendientes: "+db.count());return true;}
    else connection(status==401?"Clave incorrecta. Revisa la configuración.":"PC respondió "+status+"; lectura pendiente");
   }catch(Exception e){if(!stopped)connection("PC sin conexión · lecturas guardadas, reintentando");}finally{if(c!=null)c.disconnect();}
+  return false;
  }
  public void onDestroy(){
   stopped=true;previewOwner=null;previewSurface=null;if(network!=null){network.shutdownNow();}

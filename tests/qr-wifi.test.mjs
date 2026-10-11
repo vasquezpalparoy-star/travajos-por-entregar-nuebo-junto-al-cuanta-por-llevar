@@ -43,3 +43,29 @@ test('cerrar ventana Windows confirma lectura y despierta sin depender del tempo
  closed=true;await wake();assert.equal(open,false);assert.equal(requests.filter(x=>x==='/ack').length,1);
  stop();assert.equal(unsubscribed,true);
 });
+
+test('registro QR valida datos, propietario, importes y no acepta un pago mayor',async()=>{
+ const {registrationData}=await import('../qr-wifi.mjs');
+ const action={id:'12345678-1234-1234-1234-123456789012',data:{codigo:'ABC',nombre:' Ana ',telefono:'999',descripcion:'Copias',ubicacion:'E2',hojas:'2',total:'20.50',pago:'5'}};
+ const row=registrationData(action,'owner');assert.equal(row.user_id,'owner');assert.equal(row.codigo,'ABC');assert.equal(row.nombre,'ANA');assert.equal(row.total,20.5);
+ for(const change of [{pago:'21'},{hojas:'0'},{hojas:'1.5'},{total:'NaN'},{nombre:''},{codigo:'x'.repeat(257)}])assert.throws(()=>registrationData({...action,data:{...action.data,...change}},'owner'));
+});
+test('reintento tras guardar usa el mismo ID y no inserta otro trabajo',async()=>{
+ const {createQrRecord}=await import('../qr-wifi.mjs');let inserted=0;
+ const api={from(){const q={select(){return q},eq(){return q},limit:async()=>({data:[{id:'saved'}]}),insert:async()=>{inserted++;return {}}};return q}};
+ await createQrRecord(api,'owner',{id:'12345678-1234-1234-1234-123456789012',data:{codigo:'001',nombre:'Ana',telefono:'',descripcion:'Copias',ubicacion:'E1',hojas:'1',total:'15',pago:'0'}});assert.equal(inserted,0);
+});
+test('el último QR reemplaza una ventana abierta sin cerrarla y confirma los anteriores después de mostrarlo',async()=>{
+ let next,open=false,latest={evento:'one',codigo:'001'};const shown=[],requests=[];
+ const fetcher=async(path,options)=>{requests.push([path,options]);return {ok:true,json:async()=>path==='/events'?{pendientes:2,latest,events:[latest]}:path==='/popup-state'?{closed:false,evento:shown.at(-1)?.[1]}:{ok:true}}};
+ const stop=startWifiReceiver({fetcher,canRead:()=>true,isModalOpen:()=>open,show:async(code,event)=>{shown.push([code,event]);open=true},closeModal:()=>open=false,status:()=>{},schedule:fn=>next=fn});
+ await new Promise(setImmediate);latest={evento:'two',codigo:'002'};await next();
+ assert.deepEqual(shown,[['001','one'],['002','two']]);assert.equal(open,true);assert.equal(requests.some(r=>r[0]==='/ack'),false);
+ assert.equal(JSON.parse(requests.filter(r=>r[0]==='/ack-before').at(-1)[1].body).evento,'two');stop();
+});
+test('formulario nativo en edición conserva sus datos hasta guardar o cancelar',async()=>{
+ let next,open=false,latest={evento:'one',codigo:'001'},editing=false;const shown=[];
+ const fetcher=async path=>({ok:true,json:async()=>path==='/events'?{pendientes:2,latest}:path==='/popup-state'?{editing,evento:'one'}:{ok:true}});
+ const stop=startWifiReceiver({fetcher,canRead:()=>true,isModalOpen:()=>open,show:async code=>{shown.push(code);open=true},closeModal:()=>{},status:()=>{},schedule:fn=>next=fn});
+ await new Promise(setImmediate);editing=true;latest={evento:'two',codigo:'002'};await next();assert.deepEqual(shown,['001']);editing=false;await next();assert.deepEqual(shown,['001','002']);stop();
+});

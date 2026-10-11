@@ -11,6 +11,8 @@ class PendingDb extends SQLiteOpenHelper {
   SQLiteDatabase d=getWritableDatabase();try(Cursor c=d.rawQuery("SELECT COUNT(*) FROM pendientes",null)){c.moveToFirst();if(c.getInt(0)>=1000)return false;}
   ContentValues v=new ContentValues();v.put("id",UUID.randomUUID().toString());v.put("codigo",codigo);v.put("fecha",System.currentTimeMillis());d.insertOrThrow("pendientes",null,v);return true;
  }
+ synchronized boolean ensurePending(String code){try(Cursor c=getReadableDatabase().rawQuery("SELECT id FROM pendientes WHERE codigo=? LIMIT 1",new String[]{code})){if(c.moveToFirst())return true;}return add(code);}
+ synchronized int count(){try(Cursor c=getReadableDatabase().rawQuery("SELECT COUNT(*) FROM pendientes",null)){c.moveToFirst();return c.getInt(0);}}
  synchronized String[] first(){try(Cursor c=getReadableDatabase().rawQuery("SELECT id,codigo FROM pendientes ORDER BY fecha,rowid LIMIT 1",null)){return c.moveToFirst()?new String[]{c.getString(0),c.getString(1)}:null;}}
  synchronized void remove(String id){getWritableDatabase().delete("pendientes","id=?",new String[]{id});}
 }

@@ -21,7 +21,7 @@ public class MainActivity extends Activity {
   WindowManager.LayoutParams p=getWindow().getAttributes();p.screenBrightness=-1;getWindow().setAttributes(p);
   panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(28,30,28,20);
   ScrollView scroll=new ScrollView(this);scroll.addView(panel);setContentView(scroll);
-  label("QR Clientes · versión 1.7",26);label("Cámara trasera · conexión Wi-Fi a tu PC",16);
+  label("QR Clientes · versión 1.8",26);label("Cámara trasera · conexión Wi-Fi a tu PC",16);
   label("Dirección que muestra el programa de PC",14);
   address=new EditText(this);address.setSingleLine();address.setInputType(17);address.setHint("http://192.168.1.10:8765");address.setText(getSharedPreferences("qr",0).getString("url",""));panel.addView(address);
   label("Clave de conexión de la PC",14);token=new EditText(this);token.setSingleLine();token.setText(getSharedPreferences("qr",0).getString("token",""));panel.addView(token);
@@ -80,7 +80,7 @@ public class MainActivity extends Activity {
  void showScanner(){
   scannerScreen=true;dark=false;getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
   panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(16,16,16,16);setContentView(panel);
-  label("Cámara trasera · QR Clientes 1.7",20);
+  label("Cámara trasera · QR Clientes 1.8",20);
   FrameLayout viewfinder=new FrameLayout(this);viewfinder.setBackgroundColor(Color.BLACK);panel.addView(viewfinder,new LinearLayout.LayoutParams(-1,0,1));
   preview=new CameraPreview(this);viewfinder.addView(preview,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
   preview.getHolder().addCallback(new SurfaceHolder.Callback(){
@@ -93,6 +93,7 @@ public class MainActivity extends Activity {
   });
   status=label("Abriendo cámara…",16);lastRead=label("",15);connectionStatus=label("",15);
   label("Sostén el QR a 15–25 cm, con buena luz. El resultado aparecerá en la PC. Puedes cambiar de aplicación; el lector seguirá activo con una notificación.",14);
+  button("Enviar último QR / Reintentar",()->{if(scanner!=null)scanner.resendLast();else status.setText("Espera a que se abra la cámara");});
   button("Enviar QR de prueba 001",()->sendTest());
   button("Seguir en segundo plano",()->{detachPreview();moveTaskToBack(true);});
   button("Detener y volver",()->{detachPreview();stopService(new Intent(this,ScannerService.class));showForm();});

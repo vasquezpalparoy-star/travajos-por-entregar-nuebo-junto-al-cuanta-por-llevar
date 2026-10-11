@@ -1,7 +1,7 @@
 @echo off
 setlocal
 set "GRAFIPLOT_ROOT=%~dp0"
-title Grafiplot 1.6 - CUENTAS configurado
+title Grafiplot 1.8 - CUENTAS configurado
 if not exist "%GRAFIPLOT_ROOT%lector-wifi\INICIAR_WINDOWS.bat" (
  echo Extrae TODO el ZIP. Falta la carpeta lector-wifi.
  pause

@@ -46,6 +46,15 @@ class Lecturas:
             rows = db.execute('SELECT evento,codigo,fecha FROM lecturas WHERE visto=0 ORDER BY fecha,rowid LIMIT 20').fetchall()
             count = db.execute('SELECT COUNT(*) FROM lecturas WHERE visto=0').fetchone()[0]
         return [{'evento':e,'codigo':c,'fecha':f} for e,c,f in rows], count
+    def ultima(self):
+        with self.conectar() as db:
+            row=db.execute('SELECT evento,codigo,fecha FROM lecturas WHERE visto=0 ORDER BY fecha DESC,rowid DESC LIMIT 1').fetchone()
+        return dict(zip(('evento','codigo','fecha'),row)) if row else None
+    def confirmar_anteriores(self, evento):
+        with self.conectar() as db:
+            row=db.execute('SELECT rowid,fecha FROM lecturas WHERE evento=? AND visto=0',(evento,)).fetchone()
+            if not row:raise ValueError('Lectura no pendiente')
+            db.execute('UPDATE lecturas SET visto=1 WHERE visto=0 AND (fecha<? OR (fecha=? AND rowid<?))',(row[1],row[1],row[0]))
     def confirmar(self, evento):
         with self.conectar() as db: db.execute('UPDATE lecturas SET visto=1 WHERE evento=?',(evento,))
 
@@ -110,14 +119,14 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=='/connection': return self.response(200,{'url':f'http://{self.server.ip_wifi()}:{self.server.server_port}','token':self.server.datos.token})
             if self.path=='/popup-state':
                 popup=self.server.popup
-                return self.response(200,{'closed':bool(popup and popup.event and popup.closed(popup.event)),'evento':popup.event if popup else None})
-            events,count=self.server.datos.pendientes();return self.response(200,{'events':events,'pendientes':count})
+                return self.response(200,{'closed':bool(popup and popup.event and popup.closed(popup.event)),'evento':popup.event if popup else None,'action':popup.action() if popup and hasattr(popup,'action') else None,'editing':bool(popup and hasattr(popup,'editing') and popup.editing())})
+            events,count=self.server.datos.pendientes();return self.response(200,{'events':events,'pendientes':count,'latest':self.server.datos.ultima()})
         self.response(404,{'error':'Ruta no encontrada'})
     def do_POST(self):
         self.connection.settimeout(5)
         if self.path == '/scan':
             if not self.device(): return self.response(401,{'error':'Clave incorrecta'})
-        elif self.path in ('/ack','/popup'):
+        elif self.path in ('/ack','/ack-before','/popup','/popup-action-ack'):
             if not self.browser(mutation=True): return self.response(403,{'error':'Acceso local no autorizado'})
         else: return self.response(404,{'error':'Ruta no encontrada'})
         try:
@@ -127,19 +136,28 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(obj,dict): raise ValueError('Lectura inválida')
             evento=obj.get('evento')
             if not isinstance(evento,str) or not 1<=len(evento)<=100: raise ValueError('Evento inválido')
-            if self.path=='/popup':
+            if self.path=='/popup-action-ack':
+                action_id=obj.get('id');message=obj.get('message','')
+                if not isinstance(action_id,str) or len(action_id)>100 or not isinstance(message,str) or len(message)>500:raise ValueError('Acción inválida')
+                with self.server.popup_lock:
+                    popup=self.server.popup
+                    if not popup or popup.event!=evento:raise ValueError('Lectura no pendiente')
+                    popup.action_ack(action_id,message)
+            elif self.path=='/popup':
                 text=obj.get('text')
                 if not isinstance(text,str) or not 1<=len(text)<=3000:raise ValueError('Detalle inválido')
                 details=obj.get('details')
                 if details is not None:
                     if not isinstance(details,dict):raise ValueError('Ficha inválida')
-                    limits={'codigo':256,'nombre':200,'deuda':32,'descripcion':1200,'ubicacion':100,'telefono':64}
+                    limits={'codigo':256,'nombre':200,'deuda':32,'descripcion':1200,'ubicacion':100,'telefono':64,'completo':8000}
                     if any(k not in limits or not isinstance(v,str) or len(v)>limits[k] for k,v in details.items()):raise ValueError('Ficha inválida')
                     if details.get('deuda') and not re.fullmatch(r'\d+\.\d{2}',details['deuda']):raise ValueError('Saldo inválido')
                 events,_=self.server.datos.pendientes()
-                if not events or events[0]['evento']!=evento:raise ValueError('Lectura no pendiente')
+                if not any(e['evento']==evento for e in events) and (self.server.datos.ultima() or {}).get('evento')!=evento:raise ValueError('Lectura no pendiente')
                 with self.server.popup_lock:
                     if self.server.popup:self.server.popup.show(evento,text,details)
+            elif self.path=='/ack-before':
+                self.server.datos.confirmar_anteriores(evento)
             elif self.path=='/ack':
                 self.server.datos.confirmar(evento)
                 with self.server.popup_lock:
@@ -163,7 +181,7 @@ def main():
     try: server.popup=Ventana()
     except OSError as e: print('No se pudo abrir ventana Windows:',e)
     url=f'http://{server.local_host()}/'
-    print('Grafiplot 1.6 - CUENTAS configurado. Mantén esta ventana abierta.');print('Carpeta del sistema:',ROOT);print('Abre en esta PC:',url)
+    print('Grafiplot 1.8 - CUENTAS configurado. Mantén esta ventana abierta.');print('Carpeta del sistema:',ROOT);print('Abre en esta PC:',url)
     print('Inicia sesión con el MISMO proyecto y cuenta Supabase de tu sistema.');print('Detener: Ctrl+C')
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()

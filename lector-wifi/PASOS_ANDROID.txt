@@ -1,9 +1,26 @@
-APK 1.7 - CÁMARA CORREGIDA
+GRAFIPLOT 1.8 - ACTUALIZA PC Y APK
 
-Actualiza solo la APK. En Windows puedes conservar la versión 1.6.
-La vista de cámara conserva las proporciones: puede mostrar márgenes negros.
-Se eliminó la rotación añadida por la app; Android orienta la vista según la cámara y la pantalla.
-Instala sin desinstalar la anterior y conserva URL/clave. Pulsa Abrir cámara y escanear.
-Siguen disponibles Seguir en segundo plano y Enviar QR de prueba 001.
-Verifica primero en vertical y luego en horizontal, apuntando a un QR cuadrado: debe verse cuadrado.
-La geometría se comprobó en 64 combinaciones; la imagen real requiere prueba en tu teléfono.
+1. Cierra el receptor anterior de Windows (Ctrl+C en su consola).
+2. Extrae todo el ZIP en una carpeta nueva. Abre INICIAR_GRAFIPLOT.bat.
+3. Mantén la consola y la página Grafiplot abiertas. Inicia sesión con tu cuenta.
+4. Instala lector-wifi/QRClientes-Camara-Trasera.apk encima de la anterior, sin desinstalar.
+5. Conserva tu URL y clave. Si cambian, en la PC abre Lector Wi-Fi y copia URL/clave a la APK.
+6. PC por Ethernet y celular por Wi-Fi al mismo router. Pulsa Probar conexión.
+7. Pulsa Abrir cámara y escanear. Permite cámara y notificaciones.
+8. Acerca el QR con buena luz. La cámara trasera conserva sus proporciones.
+9. Si no llega, pulsa Enviar último QR / Reintentar. Si ya estaba pendiente, no crea otra lectura.
+10. Seguir en segundo plano mantiene el servicio con su notificación. Para detenerlo, usa Detener.
+
+WINDOWS
+El último QR reemplaza la ficha abierta. Las lecturas anteriores se conservan en el registro local,
+pero dejan de estar pendientes cuando la última ficha se muestra correctamente.
+La ficha muestra nombre, teléfono, código, ubicación, detalle, hojas, total, pago, saldo, estado,
+fecha e items. Si no existe trabajo pendiente, pulsa Agregar datos de este QR y Guarda en Grafiplot.
+El formulario conserva el borrador al fallar la conexión. Reintenta sin duplicar el trabajo.
+Mientras llenas el formulario no se cambia de QR; después de guardar/cancelar aparecerá el último.
+Para registrar/ver fichas se necesita conexión a Internet con Supabase y una sesión iniciada.
+Las lecturas Android pendientes se guardan y reintentan cuando vuelve la conexión con la PC.
+
+Comprobado: compilación/firma APK, 16 casos QR, 64 combinaciones de vista, pruebas del receptor,
+cambio al último QR, validación del registro y reintentos. Falta comprobar cámara y formulario
+en tu Android y Windows reales; no se puede garantizar un tiempo fijo de lectura.
