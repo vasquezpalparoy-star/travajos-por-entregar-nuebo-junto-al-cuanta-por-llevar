@@ -48,8 +48,12 @@ class BridgeTests(unittest.TestCase):
    self.request('/scan',{'evento':'desktop','codigo':'001'})
    with self.assertRaises(urllib.error.HTTPError) as e:self.request('/popup',{'evento':'desktop','text':'Cliente'})
    self.assertEqual(e.exception.code,403)
-   self.request('/popup',{'evento':'desktop','text':'Cliente: Ana\nDebe S/ 15.00'},browser=True)
+   self.request('/popup',{'evento':'desktop','text':'Cliente: Ana\nDebe S/ 15.00','details':{'nombre':'Ana','codigo':'001','deuda':'15.00','descripcion':'Impresión','ubicacion':'E1','telefono':'999999999'}},browser=True)
    self.assertEqual(json.loads(popup.path.read_text())['text'],'Cliente: Ana\nDebe S/ 15.00')
+   self.assertEqual(json.loads(popup.path.read_text())['details']['deuda'],'15.00')
+   for bad in [{'deuda':'no-numérico'},{'extra':'campo no permitido'},{'nombre':123}]:
+    with self.assertRaises(urllib.error.HTTPError) as e:self.request('/popup',{'evento':'desktop','text':'Detalle','details':bad},browser=True)
+    self.assertEqual(e.exception.code,400)
    self.assertFalse(json.loads(self.request('/popup-state',browser=True)[1])['closed'])
    popup.closed_path.write_text('otro-evento')
    self.assertFalse(json.loads(self.request('/popup-state',browser=True)[1])['closed'])

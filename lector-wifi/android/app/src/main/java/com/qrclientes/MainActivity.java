@@ -13,7 +13,7 @@ import java.net.*;
 public class MainActivity extends Activity {
  EditText address,token; TextView status,lastRead,connectionStatus; LinearLayout panel; boolean dark=false; boolean scannerScreen=false,bound=false,resumed=false; ScannerService scanner; Handler cameraCleanup; TextureView preview; Surface previewSurface;
  Handler handler=new Handler();
- Runnable update=new Runnable(){public void run(){if(scannerScreen&&scanner!=null&&resumed)attachPreview();if(lastRead!=null)lastRead.setText("Último QR: "+getSharedPreferences("qr",0).getString("ultimoQR","ninguno detectado"));if(connectionStatus!=null)connectionStatus.setText(getSharedPreferences("qr",0).getString("conexion","Conexión: pulsa Probar conexión"));if(status!=null)status.setText(getSharedPreferences("qr",0).getString("estado","Lector detenido"));handler.postDelayed(this,1500);}};
+ Runnable update=new Runnable(){public void run(){if(scannerScreen&&scanner!=null&&resumed)attachPreview();if(lastRead!=null)lastRead.setText("Último QR: "+getSharedPreferences("qr",0).getString("ultimoQR","ninguno detectado"));if(connectionStatus!=null)connectionStatus.setText(getSharedPreferences("qr",0).getString("conexion","Conexión: pulsa Probar conexión"));if(status!=null)status.setText(getSharedPreferences("qr",0).getString("estado","Lector detenido"));handler.postDelayed(this,500);}};
  public void onCreate(Bundle saved){super.onCreate(saved);if(saved!=null&&saved.getBoolean("scannerScreen"))showScanner();else showForm();handler.post(update);}
  public void onSaveInstanceState(Bundle b){b.putBoolean("scannerScreen",scannerScreen);super.onSaveInstanceState(b);}
  void showForm(){
@@ -21,7 +21,7 @@ public class MainActivity extends Activity {
   WindowManager.LayoutParams p=getWindow().getAttributes();p.screenBrightness=-1;getWindow().setAttributes(p);
   panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(28,30,28,20);
   ScrollView scroll=new ScrollView(this);scroll.addView(panel);setContentView(scroll);
-  label("QR Clientes · versión 1.5",26);label("Cámara trasera · conexión Wi-Fi a tu PC",16);
+  label("QR Clientes · versión 1.6",26);label("Cámara trasera · conexión Wi-Fi a tu PC",16);
   label("Dirección que muestra el programa de PC",14);
   address=new EditText(this);address.setSingleLine();address.setInputType(17);address.setHint("http://192.168.1.10:8765");address.setText(getSharedPreferences("qr",0).getString("url",""));panel.addView(address);
   label("Clave de conexión de la PC",14);token=new EditText(this);token.setSingleLine();token.setText(getSharedPreferences("qr",0).getString("token",""));panel.addView(token);
@@ -83,7 +83,7 @@ public class MainActivity extends Activity {
  void showScanner(){
   scannerScreen=true;dark=false;getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
   panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(16,16,16,16);setContentView(panel);
-  label("Cámara trasera · QR Clientes 1.5",20);
+  label("Cámara trasera · QR Clientes 1.6",20);
   preview=new TextureView(this);panel.addView(preview,new LinearLayout.LayoutParams(-1,0,1));
   preview.setSurfaceTextureListener(new TextureView.SurfaceTextureListener(){
    public void onSurfaceTextureAvailable(android.graphics.SurfaceTexture t,int w,int h){connectPreview();attachPreview();}

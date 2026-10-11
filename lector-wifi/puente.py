@@ -3,6 +3,7 @@ import argparse
 import hmac
 import json
 import os
+import re
 import secrets
 import socket
 import sys
@@ -100,7 +101,7 @@ class Handler(BaseHTTPRequestHandler):
                 generation=-1
                 while True:
                     with self.server.changes:
-                        if generation==self.server.generation:self.server.changes.wait(timeout=2)
+                        if generation==self.server.generation:self.server.changes.wait(timeout=1)
                         generation=self.server.generation
                     self.wfile.write(b'data: wake\n\n');self.wfile.flush()
             except (OSError,ConnectionError):return
@@ -121,7 +122,7 @@ class Handler(BaseHTTPRequestHandler):
         else: return self.response(404,{'error':'Ruta no encontrada'})
         try:
             size=int(self.headers.get('Content-Length','0'))
-            if not 0<size<=(16384 if self.path=='/popup' else 4096): return self.response(413,{'error':'Petición demasiado grande'})
+            if not 0<size<=(32768 if self.path=='/popup' else 4096): return self.response(413,{'error':'Petición demasiado grande'})
             obj=json.loads(self.rfile.read(size))
             if not isinstance(obj,dict): raise ValueError('Lectura inválida')
             evento=obj.get('evento')
@@ -129,10 +130,16 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=='/popup':
                 text=obj.get('text')
                 if not isinstance(text,str) or not 1<=len(text)<=3000:raise ValueError('Detalle inválido')
+                details=obj.get('details')
+                if details is not None:
+                    if not isinstance(details,dict):raise ValueError('Ficha inválida')
+                    limits={'codigo':256,'nombre':200,'deuda':32,'descripcion':1200,'ubicacion':100,'telefono':64}
+                    if any(k not in limits or not isinstance(v,str) or len(v)>limits[k] for k,v in details.items()):raise ValueError('Ficha inválida')
+                    if details.get('deuda') and not re.fullmatch(r'\d+\.\d{2}',details['deuda']):raise ValueError('Saldo inválido')
                 events,_=self.server.datos.pendientes()
                 if not events or events[0]['evento']!=evento:raise ValueError('Lectura no pendiente')
                 with self.server.popup_lock:
-                    if self.server.popup:self.server.popup.show(evento,text)
+                    if self.server.popup:self.server.popup.show(evento,text,details)
             elif self.path=='/ack':
                 self.server.datos.confirmar(evento)
                 with self.server.popup_lock:
@@ -156,7 +163,7 @@ def main():
     try: server.popup=Ventana()
     except OSError as e: print('No se pudo abrir ventana Windows:',e)
     url=f'http://{server.local_host()}/'
-    print('Grafiplot 1.4.1 - CUENTAS configurado. Mantén esta ventana abierta.');print('Carpeta del sistema:',ROOT);print('Abre en esta PC:',url)
+    print('Grafiplot 1.6 - CUENTAS configurado. Mantén esta ventana abierta.');print('Carpeta del sistema:',ROOT);print('Abre en esta PC:',url)
     print('Inicia sesión con el MISMO proyecto y cuenta Supabase de tu sistema.');print('Detener: Ctrl+C')
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()

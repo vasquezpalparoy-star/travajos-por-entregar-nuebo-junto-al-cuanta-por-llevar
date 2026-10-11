@@ -81,14 +81,14 @@ public class ScannerService extends Service {
  void closeCamera(){if(session!=null){session.close();session=null;}if(camera!=null){camera.close();camera=null;}if(images!=null){images.close();images=null;}}
  void analyze(ImageReader r){
   Image image=null;try{
-   image=r.acquireLatestImage();if(image==null)return;long now=SystemClock.elapsedRealtime();if(now-lastFrame<350)return;lastFrame=now;
+   image=r.acquireLatestImage();if(image==null)return;long now=SystemClock.elapsedRealtime();if(now-lastFrame<180)return;lastFrame=now;
    int w=image.getWidth(),h=image.getHeight();Image.Plane plane=image.getPlanes()[0];ByteBuffer buf=plane.getBuffer();int row=plane.getRowStride(),pixel=plane.getPixelStride();byte[] y=new byte[w*h];int offset=buf.position();
    for(int yy=0;yy<h;yy++)for(int xx=0;xx<w;xx++)y[yy*w+xx]=buf.get(offset+yy*row+xx*pixel);
    LuminanceSource src=new PlanarYUVLuminanceSource(y,w,h,0,0,w,h,false);Result result;
    try{result=decoder.decodeWithState(new BinaryBitmap(new HybridBinarizer(src)));}catch(NotFoundException e){decoder.reset();result=decoder.decodeWithState(new BinaryBitmap(new HybridBinarizer(src.invert())));}
    String code=result.getText().trim();if(code.length()==0||code.length()>256){state("QR inválido: usa un código de cliente de hasta 256 caracteres");return;}
    boolean fresh=!code.equals(lastCode)||now-lastSeen>2000;lastSeen=now;
-   if(fresh){if(db.add(code)){lastCode=code;getSharedPreferences("qr",0).edit().putString("ultimoQR",code).apply();state("QR guardado: "+code);}else{state("Cola llena (1000). Conecta la PC para enviar pendientes.");}}
+   if(fresh){if(db.add(code)){lastCode=code;getSharedPreferences("qr",0).edit().putString("ultimoQR",code).apply();state("QR guardado: "+code);if(network!=null&&!stopped)network.execute(()->sendPending());}else{state("Cola llena (1000). Conecta la PC para enviar pendientes.");}}
   }catch(NotFoundException e){}catch(Exception e){state("Error al leer QR: "+e.getMessage());}finally{decoder.reset();if(image!=null)image.close();}
  }
  void connection(String msg){getSharedPreferences("qr",0).edit().putString("conexion",msg).apply();}

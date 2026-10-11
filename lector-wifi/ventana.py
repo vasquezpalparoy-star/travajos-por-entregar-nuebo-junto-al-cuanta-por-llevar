@@ -25,10 +25,10 @@ class Ventana:
         staging = self.path.with_suffix('.tmp')
         staging.write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8')
         os.replace(staging,self.path)
-    def show(self, event, text):
+    def show(self, event, text, details=None):
         self.event = event
         self.closed_path.unlink(missing_ok=True)
-        self.write({'visible':True,'evento':event,'text':text})
+        self.write({'visible':True,'evento':event,'text':text,'details':details})
     def closed(self, event):
         try:return self.closed_path.read_text(encoding='utf-8') == event
         except OSError:return False

@@ -301,7 +301,7 @@
     <div id="cloud-gate" class="fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3">
             <h2 class="text-xl font-black text-slate-900">Conectar Grafiplot</h2>
-            <p class="text-xs font-bold text-green-700">VERSIÓN 1.4.1 · CUENTAS CONFIGURADO</p>
+            <p class="text-xs font-bold text-green-700">VERSIÓN 1.6 · CUENTAS CONFIGURADO</p>
             <p class="text-sm text-slate-600">La conexión a CUENTAS ya está configurada. Entra con tu usuario de Grafiplot; este navegador recordará tu sesión.</p>
             <form id="cloud-form" class="space-y-3">
                 <details class="text-xs text-slate-500">
@@ -1296,7 +1296,7 @@
                         const text = record
                             ? `Código: ${record.codigo}\nCliente: ${record.nombre}\nDebe S/ ${debtInSoles(record.precio, record.pago)}\n\nDetalle: ${record.descripcion || ''}\nUbicación: ${record.ubicacion || ''}\nTeléfono: ${record.celular || ''}`
                             : `Código: ${code}\nNo hay un trabajo pendiente con este código.`;
-                        const popupResponse = await fetch('/popup', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({evento,text:text.slice(0,3000)}),signal:AbortSignal.timeout(5000)});
+                        const popupResponse = await fetch('/popup', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({evento,text:text.slice(0,3000),details:{codigo:String(record?.codigo || code).slice(0,256),nombre:String(record?.nombre || 'Sin trabajo pendiente').slice(0,200),deuda:record?debtInSoles(record.precio,record.pago):'',descripcion:String(record?.descripcion || 'No hay un trabajo pendiente con este código.').slice(0,1200),ubicacion:String(record?.ubicacion || '').slice(0,100),telefono:String(record?.celular || '').slice(0,64)}}),signal:AbortSignal.timeout(5000)});
                         if (!popupResponse.ok) status.textContent = 'El resultado está en Grafiplot; no se pudo mostrar la ventana Windows.';
                         document.title = 'QR recibido · Grafiplot';
                     }

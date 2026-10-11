@@ -1,6 +1,6 @@
-APK 1.5 - CÁMARA EN PANTALLA
+APK 1.6 - CÁMARA EN PANTALLA
 
-1. Instala la APK 1.5 como actualización, sin desinstalar la anterior.
+1. Instala la APK 1.6 como actualización, sin desinstalar la anterior.
 2. Conserva la URL y clave de conexión que ya pusiste. Pulsa Probar conexión.
 3. Pulsa Abrir cámara y escanear. Concede cámara y notificaciones.
 4. Verás la cámara trasera en pantalla y el estado de las lecturas.
@@ -10,7 +10,7 @@ APK 1.5 - CÁMARA EN PANTALLA
 8. Detener y volver apaga el lector y regresa a la configuración.
 
 No hace falta el permiso Mostrar sobre otras apps.
-En la PC usa el receptor 1.4.1 que ya tienes; deja navegador y consola abiertos.
+En la PC usa el receptor 1.6 de este paquete; deja navegador y consola abiertos.
 No cierres el lector desde la pantalla de aplicaciones activas. Inícialo otra vez tras reiniciar el teléfono.
 Si el teléfono lo detiene, revisa Ajustes de batería desde la APK y permite actividad en segundo plano.
 La compilación y firma están verificadas. Falta probar la cámara y el cambio de aplicación en tu teléfono.
@@ -19,3 +19,8 @@ SI NO APARECE NADA EN WINDOWS
 Pulsa Enviar QR de prueba 001. Si la APK dice Sin conexión, revisa URL/clave/Wi-Fi/firewall.
 Si dice Prueba 001 enviada a PC, deja Grafiplot abierto con sesión iniciada y revisa sus lecturas pendientes.
 Si la prueba funciona pero la cámara no, revisa Último QR en la APK: si dice ninguno detectado, aleja el QR a 15–25 cm e ilumínalo.
+
+VERSIÓN RÁPIDA 1.6
+La APK envía el QR inmediatamente al detectarlo. En Windows, la ficha tiene el estilo de Grafiplot: nombre, saldo y detalle.
+Actualiza la APK y también la carpeta de Windows para aplicar ambas mejoras. Cierra el receptor anterior antes de abrir el nuevo.
+La rapidez final depende del teléfono, Wi-Fi y consulta de los registros. Cierra la ficha actual para atender el siguiente QR pendiente.

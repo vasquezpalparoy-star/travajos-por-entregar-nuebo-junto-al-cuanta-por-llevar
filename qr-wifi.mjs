@@ -24,7 +24,7 @@ export async function findCloudRecord(api, ownerId, code) {
     }
     return null;
 }
-export function startWifiReceiver({fetcher = fetch, canRead, isModalOpen, show, status, closeModal, subscribe, schedule = (fn) => setTimeout(fn, 1200)}) {
+export function startWifiReceiver({fetcher = fetch, canRead, isModalOpen, show, status, closeModal, subscribe, schedule = (fn) => setTimeout(fn, 300)}) {
     let stopped = false;
     let running = false;
     let unsubscribe;

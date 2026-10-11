@@ -71,3 +71,7 @@ Validación: pruebas de receptor, autorización local, eventos, confirmación y 
 ## APK 1.5
 
 Sustituye la ventana flotante por una pantalla de cámara dentro de la APK. Abrir cámara y escanear inicia el servicio de cámara con la app visible. Seguir en segundo plano envía la tarea al fondo y separa únicamente la vista previa: continúa el análisis YUV y el envío de lecturas. Al volver, la vista previa se conecta al mismo servicio. No requiere SYSTEM_ALERT_WINDOW. La PC utiliza el receptor 1.4.1 existente.
+
+## Versión 1.6
+
+Envío inmediato al detectar QR, análisis cada 180 ms como máximo y lectura de novedades de ventana Windows cada 100 ms. La ficha de Windows sigue el estilo de Grafiplot y recibe campos estructurados validados. Se mantiene la consulta actual de datos al leer cada QR; no se utiliza una deuda almacenada en caché. Las cifras indican intervalos programados, no latencia total garantizada.
