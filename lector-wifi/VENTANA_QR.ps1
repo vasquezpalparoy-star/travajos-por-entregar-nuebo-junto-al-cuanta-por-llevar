@@ -7,7 +7,7 @@ $form.Text = 'Grafiplot - Ficha del cliente'
 $form.Size = New-Object System.Drawing.Size(580,760)
 $form.MinimumSize = New-Object System.Drawing.Size(540,700)
 $form.StartPosition = 'CenterScreen'
-$form.TopMost = $true
+$form.TopMost = $false
 $form.ShowInTaskbar = $true
 $form.BackColor = [System.Drawing.ColorTranslator]::FromHtml('#F8FAFC')
 $form.Font = New-Object System.Drawing.Font('Segoe UI',11)
@@ -136,6 +136,10 @@ function Close-Reading {
 }
 $button.Add_Click({ Close-Reading })
 $form.Add_FormClosing({param($sender,$event) if (-not $script:allowClose) { $event.Cancel = $true; Close-Reading }})
+# Bring forward on a new scan, then allow Chrome and other apps to cover this form.
+$releaseFront = New-Object System.Windows.Forms.Timer
+$releaseFront.Interval = 600
+$releaseFront.Add_Tick({ $form.TopMost = $false; $releaseFront.Stop() })
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 100
 $timer.Add_Tick({
@@ -173,10 +177,10 @@ $timer.Add_Tick({
    $code.Text = 'LECTURA QR'; $name.Text = 'Resultado de lectura'; $location.Text = ''; $phone.Text = ''
    $moneyCaption.Text = 'RESULTADO'; $debt.Text = 'Ver detalle'; $detail.Text = ([string]$data.text).Replace("`n", "`r`n")
   }
-  $form.Show(); $form.TopMost = $true; $form.Activate()
+  $form.Show(); $form.TopMost = $true; $form.Activate(); $releaseFront.Stop(); $releaseFront.Start()
  } catch { }
 })
 $timer.Start()
 $context = New-Object System.Windows.Forms.ApplicationContext
-$form.Add_FormClosed({$timer.Stop();$context.ExitThread()})
+$form.Add_FormClosed({$timer.Stop();$releaseFront.Stop();$context.ExitThread()})
 [System.Windows.Forms.Application]::Run($context)

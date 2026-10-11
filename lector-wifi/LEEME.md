@@ -82,3 +82,5 @@ Reemplaza TextureView y su matriz manual por SurfaceView con proporciones conser
 
 
 Versión 1.8: actualizar PC y APK. Ficha completa, registro nativo cuando no hay trabajo pendiente, último QR reemplaza la ficha abierta, reenvío manual y envío continuo de la cola. Consulta PASOS_ANDROID.txt.
+
+Corrección PC 1.8.1: ficha QR flotante y minimizable en Chrome; la ventana nativa deja de mantenerse permanentemente encima de otras aplicaciones. APK 1.8 sin cambios.

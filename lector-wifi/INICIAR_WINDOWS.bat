@@ -3,8 +3,8 @@ setlocal
 set "GRAFIPLOT_LECTOR=%~dp0"
 cd /d "%GRAFIPLOT_LECTOR%"
 if errorlevel 1 goto ruta
-title Grafiplot 1.8 - Receptor QR
-echo Grafiplot 1.8 - iniciando receptor
+title Grafiplot 1.8.1 - Receptor QR
+echo Grafiplot 1.8.1 - iniciando receptor
 if not exist "puente.py" goto incompleto
 if not exist "..\index.html" goto incompleto
 if not exist "..\qr-wifi.mjs" goto incompleto

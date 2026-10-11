@@ -1,3 +1,13 @@
+CORRECCIÓN PC 1.8.1 / APK 1.8
+
+Actualiza solo la PC. Conserva la APK 1.8 instalada.
+Cierra la consola del receptor anterior (Ctrl+C), extrae todo el paquete y abre INICIAR_GRAFIPLOT.bat.
+La ficha de Chrome ahora es pequeña y flotante: no oscurece ni bloquea el resto del sistema.
+Pulsa Minimizar para dejar solo la barra del último QR. Mostrar abre sus detalles otra vez.
+Los nuevos QR respetan esa opción. Puedes abrir otras pestañas de Chrome mientras lee.
+La ventana de Windows aparece al escanear y después permite colocar otras ventanas encima.
+No cierres la página Grafiplot ni la consola si quieres seguir recibiendo lecturas.
+
 GRAFIPLOT 1.8 - ACTUALIZA PC Y APK
 
 1. Cierra el receptor anterior de Windows (Ctrl+C en su consola).

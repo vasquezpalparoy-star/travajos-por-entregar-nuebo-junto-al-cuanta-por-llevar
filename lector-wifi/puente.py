@@ -181,7 +181,7 @@ def main():
     try: server.popup=Ventana()
     except OSError as e: print('No se pudo abrir ventana Windows:',e)
     url=f'http://{server.local_host()}/'
-    print('Grafiplot 1.8 - CUENTAS configurado. Mantén esta ventana abierta.');print('Carpeta del sistema:',ROOT);print('Abre en esta PC:',url)
+    print('Grafiplot 1.8.1 - CUENTAS configurado. Mantén esta ventana abierta.');print('Carpeta del sistema:',ROOT);print('Abre en esta PC:',url)
     print('Inicia sesión con el MISMO proyecto y cuenta Supabase de tu sistema.');print('Detener: Ctrl+C')
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()

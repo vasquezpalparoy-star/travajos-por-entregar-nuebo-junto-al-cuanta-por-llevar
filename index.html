@@ -285,11 +285,14 @@
         </div>
     </div>
 
-    <!-- Modal Resultado Escaneo / Código Libre -->
-    <div id="scan-result-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 max-h-[90vh] overflow-y-auto transform scale-95 transition-transform relative" id="scan-result-content">
-            <!-- Contenido dinámico inyectado por JS -->
+    <!-- Ficha QR flotante: permite trabajar en el resto de Chrome -->
+    <div id="scan-result-modal" class="fixed bottom-4 right-4 z-40 hidden w-[calc(100%-2rem)] sm:w-96 max-h-[80vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200">
+        <div class="flex items-center justify-between gap-2 p-3 border-b border-gray-100 shrink-0">
+            <span id="scan-result-title" class="font-bold text-xs text-fuchsia-700 truncate">Último QR</span>
+            <button id="scan-result-toggle" type="button" onclick="toggleScanResultPanel()" class="text-xs font-bold text-gray-600 px-2 py-1 rounded hover:bg-gray-100">Minimizar</button>
+            <button type="button" onclick="hideScanResultModal()" class="text-xs font-bold text-red-600 px-2 py-1 rounded hover:bg-red-50" aria-label="Cerrar ficha QR">Cerrar</button>
         </div>
+        <div class="p-5 overflow-y-auto relative" id="scan-result-content"></div>
     </div>
 
     <!-- Contenedor Toast -->
@@ -301,7 +304,7 @@
     <div id="cloud-gate" class="fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3">
             <h2 class="text-xl font-black text-slate-900">Conectar Grafiplot</h2>
-            <p class="text-xs font-bold text-green-700">VERSIÓN 1.8 · CUENTAS CONFIGURADO</p>
+            <p class="text-xs font-bold text-green-700">VERSIÓN 1.8.1 · CUENTAS CONFIGURADO</p>
             <p class="text-sm text-slate-600">La conexión a CUENTAS ya está configurada. Entra con tu usuario de Grafiplot; este navegador recordará tu sesión.</p>
             <form id="cloud-form" class="space-y-3">
                 <details class="text-xs text-slate-500">
@@ -986,6 +989,8 @@
 
             const contentDiv = document.getElementById('scan-result-content');
             if (!contentDiv) return;
+            document.getElementById('scan-result-title').textContent = 'Último QR: ' + rawText;
+            applyScanResultPanel();
 
             if (record) {
                 const cleanPhone = record.celular ? record.celular.replace(/\D/g, '') : '';
@@ -1075,6 +1080,17 @@
                 `;
             }
             document.getElementById('scan-result-modal').classList.remove('hidden');
+        };
+
+        let scanResultMinimized = localStorage.getItem('grafiplot_qr_minimized') === '1';
+        function applyScanResultPanel() {
+            document.getElementById('scan-result-content').classList.toggle('hidden', scanResultMinimized);
+            document.getElementById('scan-result-toggle').textContent = scanResultMinimized ? 'Mostrar' : 'Minimizar';
+        }
+        window.toggleScanResultPanel = () => {
+            scanResultMinimized = !scanResultMinimized;
+            localStorage.setItem('grafiplot_qr_minimized', scanResultMinimized ? '1' : '0');
+            applyScanResultPanel();
         };
 
         window.hideScanResultModal = () => {
