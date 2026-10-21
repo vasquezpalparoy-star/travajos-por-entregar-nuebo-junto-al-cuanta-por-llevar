@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.sqlite
+*.sqlite-*
+*.p12
+*.jks
+local.properties
+.gradle/
+build/
+*.apk.idsig
+
+lector-wifi/runtime/
+lector-wifi/runtime-preparando/
+lector-wifi/python-portable.zip
