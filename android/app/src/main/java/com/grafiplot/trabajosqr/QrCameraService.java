@@ -54,6 +54,7 @@ public class QrCameraService extends LifecycleService {
     private LinearLayout overlay;
     private TextView overlayInfo;
     private String overlayCode;
+    private String lastDebtText;
 
     @Override public void onCreate() {
         super.onCreate();
@@ -92,7 +93,9 @@ public class QrCameraService extends LifecycleService {
         PendingIntent stop = PendingIntent.getService(this, 3, new Intent(this, QrCameraService.class).setAction("STOP"), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         return new Notification.Builder(this, CHANNEL).setSmallIcon(android.R.drawable.ic_menu_camera)
             .setContentTitle("GRAFIPLOT · Cámara activa")
-            .setContentText((front ? "Cámara delantera" : "Cámara trasera") + " · Buscando códigos QR")
+            .setContentText(lastDebtText != null ? lastDebtText : (front ? "Cámara delantera" : "Cámara trasera") + " · Buscando códigos QR")
+            .setStyle(new Notification.BigTextStyle().bigText(lastDebtText != null ? lastDebtText : "Acerca un código QR para consultar su deuda."))
+            .setVisibility(Notification.VISIBILITY_PRIVATE).setOnlyAlertOnce(true)
             .setOngoing(true).setContentIntent(openIntent(null))
             .addAction(new Notification.Action.Builder(android.R.drawable.ic_menu_close_clear_cancel, "Detener", stop).build()).build();
     }
@@ -164,6 +167,7 @@ public class QrCameraService extends LifecycleService {
                     if (!mainFrame) return;
                     try {
                         JSONObject data=new JSONObject(message.getData());
+                        if (running) notifyDebt(data);
                         if (overlayInfo!=null && data.optString("codigo").equals(overlayCode)) {
                             String info=data.optString("error");
                             if (info.isEmpty()) {
@@ -176,6 +180,40 @@ public class QrCameraService extends LifecycleService {
                 });
         }
         publisher.loadUrl("https://appassets.androidplatform.net/assets/service-bridge.html");
+    }
+    private void notifyDebt(JSONObject data) {
+        String code = data.optString("codigo");
+        if (!code.matches("[0-9]{3}")) return;
+        String title, detail;
+        if (!data.optString("error").isEmpty()) {
+            title = "QR " + code + " · Deuda no disponible";
+            detail = data.optString("error");
+        } else if (!data.optBoolean("encontrado")) {
+            title = "QR " + code + " · Sin cuenta asignada";
+            detail = "Completa los datos de este código en la PC.";
+        } else {
+            double total = data.optDouble("total",0), paid = data.optDouble("pago",0);
+            if (!Double.isFinite(total)) total=0;
+            if (!Double.isFinite(paid)) paid=0;
+            double debt = Math.max(0, Math.round((total-paid)*100)/100.0);
+            String debtLabel = debt > 0 ? "Debe S/ " + money(debt) : "Sin deuda · S/ 0.00";
+            title = "QR " + code + " · " + debtLabel;
+            String name = data.optString("nombre","Cliente");
+            detail = name + "\nTotal: S/ " + money(total) + " · A cuenta: S/ " + money(paid) +
+                "\n" + debtLabel + "\nToca para abrir la ficha.";
+        }
+        lastDebtText = title + "\n" + detail;
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        manager.notify(102,new Notification.Builder(this,ALERT_CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setContentTitle(title).setContentText(detail)
+            .setStyle(new Notification.BigTextStyle().bigText(detail))
+            .setContentIntent(openIntent(code)).setAutoCancel(true)
+            .setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PRIVATE).build());
+        manager.notify(101,ongoing());
+    }
+    private static String money(double value) {
+        return String.format(java.util.Locale.US,"%.2f",value);
     }
     private void publishCode(String code) {
         if (!publisherReady) { if(pendingCodes.size()<10) pendingCodes.add(code); return; }
