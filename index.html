@@ -294,8 +294,10 @@
             <form id="cloud-form" class="space-y-3">
                 <input id="cloud-email" type="email" required placeholder="Correo" autocomplete="username" class="w-full border rounded-xl p-3 text-sm">
                 <input id="cloud-password" type="password" required placeholder="Contraseña" autocomplete="current-password" class="w-full border rounded-xl p-3 text-sm">
+                <input id="cloud-confirm" type="password" placeholder="Repite tu contraseña" autocomplete="new-password" class="hidden w-full border rounded-xl p-3 text-sm">
                 <p id="cloud-message" class="text-sm text-red-600" role="alert"></p>
-                <button type="submit" class="w-full bg-red-600 text-white font-bold p-3 rounded-xl">Entrar y sincronizar</button>
+                <button id="cloud-submit" type="submit" class="w-full bg-red-600 text-white font-bold p-3 rounded-xl">Entrar y sincronizar</button>
+                <button id="cloud-mode" type="button" class="w-full text-blue-700 font-bold p-2">Crear una cuenta nueva</button>
             </form>
         </div>
     </div>
@@ -380,20 +382,49 @@
             }
         }
 
+        let creatingAccount = false;
+        const cloudSubmit = document.getElementById('cloud-submit');
+        const cloudMode = document.getElementById('cloud-mode');
+        const cloudConfirm = document.getElementById('cloud-confirm');
+        const cloudPassword = document.getElementById('cloud-password');
+        cloudMode.addEventListener('click', () => {
+            creatingAccount = !creatingAccount;
+            cloudConfirm.classList.toggle('hidden', !creatingAccount);
+            cloudConfirm.required = creatingAccount;
+            cloudPassword.minLength = creatingAccount ? 8 : 0;
+            cloudPassword.autocomplete = creatingAccount ? 'new-password' : 'current-password';
+            cloudSubmit.textContent = creatingAccount ? 'Crear mi cuenta' : 'Entrar y sincronizar';
+            cloudMode.textContent = creatingAccount ? 'Ya tengo cuenta: iniciar sesión' : 'Crear una cuenta nueva';
+            cloudMessage.textContent = creatingAccount ? 'Elige una contraseña de al menos 8 caracteres.' : '';
+        });
+
         document.getElementById('cloud-form').addEventListener('submit', async (event) => {
             event.preventDefault();
             cloudMessage.textContent = '';
             const url = CLOUD_URL;
             const key = CLOUD_KEY;
+            cloudSubmit.disabled = true;
+            cloudMode.disabled = true;
             try {
+                if (creatingAccount && cloudPassword.value !== cloudConfirm.value) throw new Error('Las contraseñas no coinciden.');
+                if (!window.supabase?.createClient) throw new Error('No se pudo cargar la conexión. Recarga la página.');
                 if (!url.startsWith('https://')) throw new Error('La URL debe comenzar con https://');
                 const changed = !api || url !== localStorage.getItem('grafiplot_supabase_url') || key !== localStorage.getItem('grafiplot_supabase_key');
                 if (changed) api = window.supabase.createClient(url, key);
-                const {data, error} = await api.auth.signInWithPassword({
+                const credentials = {
                     email:document.getElementById('cloud-email').value.trim(),
-                    password:document.getElementById('cloud-password').value
-                });
+                    password:cloudPassword.value
+                };
+                const {data, error} = creatingAccount
+                    ? await api.auth.signUp(credentials)
+                    : await api.auth.signInWithPassword(credentials);
                 if (error) throw error;
+                if (creatingAccount && !data.session) {
+                    cloudPassword.value = '';
+                    cloudConfirm.value = '';
+                    cloudMessage.textContent = 'Revisa tu correo y confirma tu cuenta. Luego vuelve aquí e inicia sesión. Si ya tenías cuenta, usa Iniciar sesión.';
+                    return;
+                }
                 owner = data.user;
                 localStorage.setItem('grafiplot_supabase_url', url);
                 localStorage.setItem('grafiplot_supabase_key', key);
@@ -402,7 +433,8 @@
                 await refreshRecords();
                 // Reinitialize once after first configuration to attach session listeners.
                 if (changed) location.reload();
-            } catch (error) { cloudMessage.textContent = error.message || 'Error al iniciar sesión'; }
+            } catch (error) { cloudMessage.textContent = error.message || 'No se pudo completar el acceso'; }
+            finally { cloudSubmit.disabled = false; cloudMode.disabled = false; }
         });
 
         function updateAvailableCodesSelect() {
