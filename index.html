@@ -290,10 +290,8 @@
     <div id="cloud-gate" class="fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3">
             <h2 class="text-xl font-black text-slate-900">Conectar Grafiplot</h2>
-            <p class="text-sm text-slate-600">Usa el mismo proyecto y la misma cuenta Supabase del programa para PC.</p>
+            <p class="text-sm text-slate-600">Ingresa con el correo y la contraseña de tu cuenta Grafiplot.</p>
             <form id="cloud-form" class="space-y-3">
-                <input id="cloud-url" type="url" required placeholder="https://tu-proyecto.supabase.co" class="w-full border rounded-xl p-3 text-sm">
-                <input id="cloud-key" type="text" required placeholder="Clave publishable / anon" class="w-full border rounded-xl p-3 text-sm">
                 <input id="cloud-email" type="email" required placeholder="Correo" autocomplete="username" class="w-full border rounded-xl p-3 text-sm">
                 <input id="cloud-password" type="password" required placeholder="Contraseña" autocomplete="current-password" class="w-full border rounded-xl p-3 text-sm">
                 <p id="cloud-message" class="text-sm text-red-600" role="alert"></p>
@@ -313,8 +311,8 @@
 
         const gate = document.getElementById('cloud-gate');
         const cloudMessage = document.getElementById('cloud-message');
-        document.getElementById('cloud-url').value = localStorage.getItem('grafiplot_supabase_url') || '';
-        document.getElementById('cloud-key').value = localStorage.getItem('grafiplot_supabase_key') || '';
+        const CLOUD_URL = 'https://pdszypigdjnfnbldecah.supabase.co';
+        const CLOUD_KEY = 'sb_publishable_7qEw0IPoItW_hXHZVH_HAA_YR419f1J';
 
         function calcularCambio() {
             const precio = parseFloat(document.getElementById('reg-precio').value) || 0;
@@ -358,8 +356,8 @@
                 cloudMessage.textContent = 'No se pudo cargar Supabase. Comprueba Internet.';
                 return;
             }
-            const url = document.getElementById('cloud-url').value.trim();
-            const key = document.getElementById('cloud-key').value.trim();
+            const url = CLOUD_URL;
+            const key = CLOUD_KEY;
             if (!url || !key) { gate.classList.remove('hidden'); return; }
             try {
                 api = window.supabase.createClient(url, key);
@@ -377,7 +375,7 @@
                 window.addEventListener('focus', refreshRecords);
             } catch (error) {
                 console.error(error);
-                cloudMessage.textContent = 'No se pudo conectar. Revisa URL y clave pública.';
+                cloudMessage.textContent = 'No se pudo conectar. Comprueba tu conexión a Internet e inténtalo de nuevo.';
                 gate.classList.remove('hidden');
             }
         }
@@ -385,8 +383,8 @@
         document.getElementById('cloud-form').addEventListener('submit', async (event) => {
             event.preventDefault();
             cloudMessage.textContent = '';
-            const url = document.getElementById('cloud-url').value.trim();
-            const key = document.getElementById('cloud-key').value.trim();
+            const url = CLOUD_URL;
+            const key = CLOUD_KEY;
             try {
                 if (!url.startsWith('https://')) throw new Error('La URL debe comenzar con https://');
                 const changed = !api || url !== localStorage.getItem('grafiplot_supabase_url') || key !== localStorage.getItem('grafiplot_supabase_key');
