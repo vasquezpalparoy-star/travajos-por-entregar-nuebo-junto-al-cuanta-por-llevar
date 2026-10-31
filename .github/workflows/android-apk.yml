@@ -2,7 +2,7 @@ name: Compilar APK Trabajos QR
 on:
   push:
     branches: [main]
-    paths: ['android/**', 'index.html', '.github/workflows/android-apk.yml']
+    paths: ['vendor/**', 'android/**', 'index.html', '.github/workflows/android-apk.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -26,17 +26,18 @@ jobs:
         run: |
           mkdir -p android/app/src/main/assets
           cp index.html android/app/src/main/assets/index.html
+          cp -R vendor android/app/src/main/assets/vendor
       - name: Compilar y revisar
         working-directory: android
         run: gradle assembleDebug lintDebug --no-daemon
       - name: Preparar APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk GRAFIPLOT_Trabajos_QR.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk GRAFIPLOT_QR_Recibos.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: GRAFIPLOT_Trabajos_QR
-          path: GRAFIPLOT_Trabajos_QR.apk
+          name: GRAFIPLOT_QR_Recibos
+          path: GRAFIPLOT_QR_Recibos.apk
       - name: Publicar instalador
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "apk-1.0-${GITHUB_RUN_NUMBER}" GRAFIPLOT_Trabajos_QR.apk --title "GRAFIPLOT Trabajos QR APK 1.0" --notes "Android 8 o superior. Requiere Internet y permiso de cámara. Escaneo automático al iniciar sesión; cámara activa mientras la app está visible. Al minimizar o bloquear se detiene. APK de instalación directa firmada para pruebas."
+          gh release create "apk-recibos-1.1-${GITHUB_RUN_NUMBER}" GRAFIPLOT_QR_Recibos.apk --title "GRAFIPLOT QR Recibos 1.1" --notes "Android 8 o superior. Requiere Internet y permiso de cámara. Escaneo automático al iniciar sesión; cámara activa mientras la app está visible. Al minimizar o bloquear se detiene. Acceso por correo y contraseña, sin IP. Recibos PDF con selector de destino Android. Instalación independiente."

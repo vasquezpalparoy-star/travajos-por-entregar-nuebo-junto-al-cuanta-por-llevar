@@ -12,8 +12,8 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
     
     <!-- jsPDF and QRCode for PDF generation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="vendor/jspdf.umd.min.js"></script>
+    <script src="vendor/qrcode.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 
     <!-- SheetJS para exportar a Excel -->
@@ -289,7 +289,7 @@
 
     <div id="cloud-gate" class="fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3">
-            <h2 class="text-xl font-black text-slate-900">Conectar Grafiplot</h2>
+            <h2 class="text-xl font-black text-slate-900">GRAFIPLOT QR · Recibos</h2>
             <p class="text-sm text-slate-600">Ingresa con el correo y la contraseña de tu cuenta Grafiplot.</p>
             <form id="cloud-form" class="space-y-3">
                 <input id="cloud-email" type="email" required placeholder="Correo" autocomplete="username" class="w-full border rounded-xl p-3 text-sm">
@@ -674,20 +674,38 @@
         });
 
         async function generatePureQRCode(canvas, text) {
-            if (typeof QRCode === 'undefined' || !QRCode.toCanvas) {
-                throw new Error("Librería QRCode no está disponible.");
+            if (typeof qrcode !== 'function') throw new Error('No se pudo cargar el generador QR.');
+            const qr = qrcode(0, 'M');
+            qr.addData(String(text || 'SIN-CODIGO'));
+            qr.make();
+            const count = qr.getModuleCount(), margin = 4, scale = 8;
+            canvas.width = canvas.height = (count + margin * 2) * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#000000';
+            for (let row = 0; row < count; row++) {
+                for (let col = 0; col < count; col++) {
+                    if (qr.isDark(row, col)) ctx.fillRect((col + margin) * scale, (row + margin) * scale, scale, scale);
+                }
             }
-            return new Promise((resolve, reject) => {
-                QRCode.toCanvas(canvas, text, {
-                    errorCorrectionLevel: 'M',
-                    margin: 2,
-                    width: 320,
-                    color: { dark: '#000000', light: '#FFFFFF' }
-                }, function (error) {
-                    if (error) reject(error);
-                    else resolve();
-                });
-            });
+        }
+
+        function savePdf(doc, name, action = 'download') {
+            if (androidScannerMode) {
+                if (!window.GrafiplotFiles?.postMessage) throw new Error('Actualiza Android System WebView para guardar archivos.');
+                window.GrafiplotFiles.postMessage(JSON.stringify({
+                    name, mime:'application/pdf', action,
+                    base64:doc.output('datauristring').split(',')[1]
+                }));
+                showToast('Elige dónde guardar el PDF.', 'success');
+            } else if (action === 'print') {
+                doc.autoPrint();
+                window.open(doc.output('bloburl'), '_blank');
+            } else {
+                doc.save(name);
+                showToast('PDF descargado.', 'success');
+            }
         }
 
         window.editRecord = function(id) {
@@ -864,7 +882,7 @@
                     }
                 }
 
-                doc.save("Codigos_QR_Grafiplot_1_100.pdf");
+                savePdf(doc, "Codigos_QR_Grafiplot_1_100.pdf");
                 showToast("PDF descargado con éxito.", "success");
 
             } catch (error) {
@@ -917,7 +935,7 @@
                 doc.setFont("helvetica", "bold");
                 doc.text("CÓDIGO:", 10, startY);
                 doc.setFont("helvetica", "normal");
-                doc.text(record.codigo, 40, startY);
+                doc.text(String(record.codigo || 'SIN CODIGO'), 40, startY);
 
                 doc.setFont("helvetica", "bold");
                 doc.text("NOMBRE:", 10, startY + lineHeight);
@@ -974,7 +992,7 @@
                 }
                 
                 doc.setFontSize(8);
-                doc.text("Fecha: " + dateStr, 10, startY + (lineHeight*9.5));
+                doc.text("Fecha: " + dateStr, 10, 107);
 
                 const canvasBC = document.getElementById('barcode-canvas');
                 await generatePureQRCode(canvasBC, record.codigo);
@@ -992,14 +1010,7 @@
                 doc.setLineWidth(0.5);
                 doc.rect(5, 5, 95, 138);
 
-                if (action === 'print') {
-                    doc.autoPrint();
-                    window.open(doc.output('bloburl'), '_blank');
-                    showToast("Abriendo ticket...", "success");
-                } else {
-                    doc.save(`Recibo_Grafiplot_${escapeHtml(record.codigo)}.pdf`);
-                    showToast("Recibo descargado.");
-                }
+                savePdf(doc, 'Recibo_Grafiplot_' + String(record.codigo || record.id).replace(/[^a-zA-Z0-9_-]/g, '_') + '.pdf', action);
             } catch (err) {
                 console.error("Error generando recibo", err);
                 showToast("Error al crear el recibo.", "error");
