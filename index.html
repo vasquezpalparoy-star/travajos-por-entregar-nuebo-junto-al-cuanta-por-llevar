@@ -308,6 +308,8 @@
         const androidScannerMode = navigator.userAgent.includes('GrafiplotAndroid/');
         let appForeground = true;
         let scannerStarting = false;
+        let lastScannedText = '';
+        let lastScanSeenAt = 0;
         let scannerWanted = true;
         let scannerQueue = Promise.resolve();
         window.grafiplotSetForeground = (visible) => {
@@ -1288,7 +1290,13 @@
                 { facingMode: "environment" },
                 config,
                 (decodedText) => {
-                    if (androidScannerMode && (!appForeground || !document.getElementById('scan-result-modal').classList.contains('hidden'))) return;
+                    if (androidScannerMode) {
+                        const now = Date.now();
+                        const repeated = decodedText === lastScannedText && now - lastScanSeenAt < 1500;
+                        lastScannedText = decodedText;
+                        lastScanSeenAt = now;
+                        if (!appForeground || repeated || !document.getElementById('scan-result-modal').classList.contains('hidden')) return;
+                    }
                     try {
                         const ctx = new (window.AudioContext || window.webkitAudioContext)();
                         const osc = ctx.createOscillator();
