@@ -40,4 +40,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "apk-recibos-1.1-${GITHUB_RUN_NUMBER}" GRAFIPLOT_QR_Recibos.apk --title "GRAFIPLOT QR Recibos 1.1" --notes "Android 8 o superior. Requiere Internet y permiso de cámara. Escaneo automático al iniciar sesión; cámara activa mientras la app está visible. Al minimizar o bloquear se detiene. Acceso por correo y contraseña, sin IP. Recibos PDF con selector de destino Android. Instalación independiente."
+          gh release create "apk-recibos-1.2-${GITHUB_RUN_NUMBER}" GRAFIPLOT_QR_Recibos.apk --title "GRAFIPLOT QR Recibos 1.2" --notes "Android 8 o superior. Requiere Internet y permiso de cámara. Escaneo automático al iniciar sesión; cámara activa mientras la app está visible. Al minimizar o bloquear se detiene. Acceso por correo y contraseña, sin IP. Recibos PDF con selector de destino Android. Cámara delantera/trasera, flash y escáner en servicio con notificación. Desde otra app, tocar la notificación abre la ficha. No se inicia al reiniciar el teléfono."

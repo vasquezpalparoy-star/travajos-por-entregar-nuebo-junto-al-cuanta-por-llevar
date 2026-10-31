@@ -22,6 +22,18 @@ public class MainActivity extends Activity {
     private WebView web;
     private PermissionRequest pendingCamera;
     private boolean foreground;
+    private boolean startRequested;
+    private boolean backgroundRequested;
+    private boolean selectedFront;
+    private String pendingQr;
+    private final BroadcastReceiver scannerReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            backgroundRequested = intent.getBooleanExtra("running", false);
+            syncScannerState(intent.getStringExtra("error"));
+            String code = intent.getStringExtra("qr");
+            if (foreground && code != null) deliverQr(code);
+        }
+    };
     private byte[] pendingPdf;
     private boolean openPdfAfterSave;
     private static final String HOST = "appassets.androidplatform.net";
@@ -73,7 +85,36 @@ public class MainActivity extends Activity {
                     }
                 });
         }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            WebViewCompat.addWebMessageListener(web, "GrafiplotScanner", Collections.singleton("https://" + HOST),
+                (view, message, origin, mainFrame, reply) -> {
+                    if (!mainFrame || !foreground || !HOST.equals(origin.getHost())) return;
+                    try {
+                        JSONObject data = new JSONObject(message.getData());
+                        String action = data.getString("action");
+                        if ("stop".equals(action)) {
+                            startRequested = false; backgroundRequested = false;
+                            stopService(new Intent(this, QrCameraService.class));
+                            syncScannerState(null);
+                        } else if ("start".equals(action)) {
+                            selectedFront = data.optBoolean("front", false);
+                            startRequested = true; backgroundRequested = true;
+                            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ||
+                                (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)) {
+                                if (android.os.Build.VERSION.SDK_INT >= 33) requestPermissions(new String[]{Manifest.permission.CAMERA, Manifest.permission.POST_NOTIFICATIONS}, 21);
+                                else requestPermissions(new String[]{Manifest.permission.CAMERA}, 21);
+                            } else startBackgroundCamera();
+                        } else if ("torch".equals(action) && QrCameraService.running) {
+                            startService(new Intent(this, QrCameraService.class).setAction("TORCH").putExtra("torch", data.optBoolean("torch", false)));
+                        }
+                    } catch (Exception error) { backgroundRequested = false; syncScannerState(error.getMessage()); }
+                });
+        }
         web.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView v, String url) {
+                syncScannerState(null);
+                if (pendingQr != null) { deliverQr(pendingQr); pendingQr = null; }
+            }
             @Override public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest request) {
                 return assets.shouldInterceptRequest(request.getUrl());
             }
@@ -113,8 +154,43 @@ public class MainActivity extends Activity {
                 return true;
             }
         });
+        pendingQr = getIntent().getStringExtra("qr");
         web.loadUrl("https://" + HOST + "/assets/index.html");
     }
+    private void startBackgroundCamera() {
+        if (!foreground || !startRequested) return;
+        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return;
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
+        startRequested = false;
+        try {
+            startForegroundService(new Intent(this, QrCameraService.class).putExtra("front", selectedFront));
+            backgroundRequested = true;
+        } catch (Exception error) { backgroundRequested = false; syncScannerState(error.getMessage()); }
+    }
+    private void syncScannerState(String message) {
+        if (web == null) return;
+        boolean active = QrCameraService.running || backgroundRequested;
+        web.evaluateJavascript("window.grafiplotBackgroundState && window.grafiplotBackgroundState(" + active + "," +
+            QrCameraService.torch + "," + JSONObject.quote(message == null ? "" : message) + ")", null);
+    }
+    private void deliverQr(String code) {
+        if (web == null) { pendingQr = code; return; }
+        web.evaluateJavascript("window.grafiplotNativeScan && window.grafiplotNativeScan(" + JSONObject.quote(code) + ")", null);
+    }
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent); setIntent(intent);
+        String code = intent.getStringExtra("qr");
+        if (code != null) deliverQr(code);
+    }
+    @Override protected void onStart() {
+        super.onStart();
+        androidx.core.content.ContextCompat.registerReceiver(this, scannerReceiver, new IntentFilter(QrCameraService.EVENT), androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);
+    }
+    @Override protected void onStop() {
+        unregisterReceiver(scannerReceiver);
+        super.onStop();
+    }
+
     @Override protected void onActivityResult(int code, int result, Intent data) {
         super.onActivityResult(code, result, data);
         if (code != 30) return;
@@ -150,6 +226,15 @@ public class MainActivity extends Activity {
 
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
+        if (code == 21) {
+            boolean granted = results.length > 0;
+            for (int result : results) if (result != PackageManager.PERMISSION_GRANTED) granted = false;
+            if (granted) web.postDelayed(this::startBackgroundCamera, 250);
+            else {
+                startRequested = false; backgroundRequested = false;
+                syncScannerState("Se necesitan permisos de cámara y notificaciones para el modo en segundo plano.");
+            }
+        }
         if (code == 20 && pendingCamera != null) {
             if (!isFinishing() && results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED)
                 pendingCamera.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
@@ -163,6 +248,9 @@ public class MainActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         foreground = true;
+        if (!startRequested) backgroundRequested = QrCameraService.running;
+        startBackgroundCamera();
+        syncScannerState(null);
         if (web != null) {
             web.onResume();
             web.evaluateJavascript("window.grafiplotSetForeground && window.grafiplotSetForeground(true)", null);
@@ -177,7 +265,7 @@ public class MainActivity extends Activity {
         super.onPause();
     }
     @Override public void onBackPressed() {
-        new AlertDialog.Builder(this).setMessage("¿Salir del escáner?")
+        new AlertDialog.Builder(this).setMessage("¿Salir? Si activaste segundo plano, la cámara seguirá activa hasta pulsar Detener en la notificación.")
             .setPositiveButton("Salir", (d,w) -> finish()).setNegativeButton("Continuar", null).show();
     }
     @Override protected void onDestroy() {

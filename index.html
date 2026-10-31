@@ -96,6 +96,17 @@
                 </button>
             </div>
 
+            <div class="flex flex-wrap items-center gap-2 mb-3">
+                <label class="text-xs font-bold">Cámara
+                    <select id="camera-facing" class="border rounded-lg p-2 bg-white">
+                        <option value="environment">Trasera</option><option value="user">Delantera</option>
+                    </select>
+                </label>
+                <button id="camera-torch" type="button" class="border rounded-lg p-2 bg-amber-100 text-xs font-bold">Encender flash</button>
+                <button id="camera-background" type="button" class="hidden border rounded-lg p-2 bg-blue-100 text-xs font-bold">Activar segundo plano</button>
+                <p id="camera-mode-status" class="w-full text-xs text-gray-600">La cámara seleccionada debe disponer de flash para poder encenderlo.</p>
+            </div>
+
             <!-- Contenedor del Escáner QR Cuadrado (Ubicado en la parte superior) -->
             <div id="scanner-container" class="hidden w-full max-w-xs sm:max-w-sm mx-auto mb-3 bg-white border-2 border-fuchsia-300 rounded-2xl p-2.5 shrink-0 shadow-lg">
                 <div class="relative w-full aspect-square rounded-xl overflow-hidden bg-black shadow-inner border border-fuchsia-200 flex items-center justify-center">
@@ -306,7 +317,25 @@
     <script type="module">
         let recoveringPassword = new URLSearchParams(location.hash.slice(1)).get('type') === 'recovery';
         const androidScannerMode = navigator.userAgent.includes('GrafiplotAndroid/');
+        let backgroundActive = false;
+        let torchActive = false;
+        let pendingNativeQr = null;
+        let cameraFacing = localStorage.getItem('grafiplot_camera_facing') || 'environment';
         let appForeground = true;
+        window.grafiplotBackgroundState = (active, torch, message) => {
+            backgroundActive = active;
+            torchActive = torch;
+            document.getElementById('camera-background').textContent = active ? 'Desactivar segundo plano' : 'Activar segundo plano';
+            document.getElementById('camera-torch').textContent = torch ? 'Apagar flash' : 'Encender flash';
+            document.getElementById('camera-mode-status').textContent = message || (active
+                ? 'Cámara activa con notificación. Fuera de la app, toca el aviso del QR para abrir su ficha.'
+                : 'Segundo plano desactivado. La cámara funciona mientras la app está visible.');
+            reconcileScanner();
+        };
+        window.grafiplotNativeScan = (code) => {
+            pendingNativeQr = String(code);
+            if (owner) refreshRecords();
+        };
         let scannerStarting = false;
         let lastScannedText = '';
         let lastScanSeenAt = 0;
@@ -320,7 +349,7 @@
         function reconcileScanner() {
             if (!androidScannerMode) return;
             scannerQueue = scannerQueue.catch(() => {}).then(async () => {
-                const shouldRun = appForeground && scannerWanted && !!owner && !recoveringPassword;
+                const shouldRun = !backgroundActive && appForeground && scannerWanted && !!owner && !recoveringPassword;
                 if (shouldRun && !isScannerRunning && !scannerStarting) {
                     await window.startScannerInstance();
                 } else if (!shouldRun && isScannerRunning && html5QrcodeScanner) {
@@ -379,6 +408,10 @@
                 .order('guardado_en', {ascending:false}).limit(500);
             if (error) { updateStatus('Error de datos', 'bg-red-500'); console.error(error); return; }
             records = (data || []).map(toRecord);
+            if (pendingNativeQr !== null) {
+                const code = pendingNativeQr; pendingNativeQr = null;
+                window.showScanResultModal(code);
+            }
             reconcileScanner();
             updateStatus('Sincronizado', 'bg-green-500', 'text-green-700');
             updateAvailableCodesSelect();
@@ -411,7 +444,7 @@
                 api.auth.onAuthStateChange((_event, sessionNow) => {
                     owner = sessionNow?.user || null;
                     gate.classList.toggle('hidden', !!owner && !recoveringPassword);
-                    if (owner) refreshRecords(); else { records = []; handleSearch(); reconcileScanner(); }
+                    if (owner) refreshRecords(); else { records = []; handleSearch(); if (backgroundActive && window.GrafiplotScanner?.postMessage) window.GrafiplotScanner.postMessage(JSON.stringify({action:'stop'})); reconcileScanner(); }
                 });
                 setInterval(refreshRecords, 6000);
                 window.addEventListener('focus', refreshRecords);
@@ -1298,7 +1331,7 @@
             };
 
             return html5QrcodeScanner.start(
-                { facingMode: "environment" },
+                { facingMode: cameraFacing },
                 config,
                 (decodedText) => {
                     if (androidScannerMode) {
@@ -1324,6 +1357,8 @@
                 () => {}
             ).then(() => {
                 scannerStarting = false;
+                torchActive = false;
+                document.getElementById('camera-torch').textContent = 'Encender flash';
                 isScannerRunning = true;
                 if (btnText) btnText.textContent = "Cerrar Cámara";
             }).catch((err) => {
@@ -1337,6 +1372,7 @@
         };
 
         window.refreshScanner = async function() {
+            if (backgroundActive) { window.GrafiplotScanner.postMessage(JSON.stringify({action:'start',front:cameraFacing === 'user'})); return; }
             showToast("Refrescando cámara...", "success");
             if (isScannerRunning && html5QrcodeScanner) {
                 try {
@@ -1351,6 +1387,7 @@
         };
 
         window.toggleScanner = function() {
+            if (backgroundActive) { showToast('Usa Desactivar segundo plano para detener este modo.'); return; }
             if (androidScannerMode) { scannerWanted = !isScannerRunning; reconcileScanner(); return; }
             const container = document.getElementById('scanner-container');
             const btnText = document.getElementById('scanner-btn-text');
@@ -1379,6 +1416,53 @@
         };
 
         window.addEventListener('DOMContentLoaded', () => {
+            const facingInput = document.getElementById('camera-facing');
+            const backgroundButton = document.getElementById('camera-background');
+            facingInput.value = cameraFacing;
+            if (androidScannerMode && window.GrafiplotScanner?.postMessage) backgroundButton.classList.remove('hidden');
+            facingInput.addEventListener('change', async () => {
+                cameraFacing = facingInput.value;
+                localStorage.setItem('grafiplot_camera_facing', cameraFacing);
+                torchActive = false;
+                document.getElementById('camera-torch').textContent = 'Encender flash';
+                if (backgroundActive) {
+                    window.GrafiplotScanner.postMessage(JSON.stringify({action:'start',front:cameraFacing === 'user'}));
+                } else if (androidScannerMode) {
+                    scannerWanted = false; reconcileScanner(); await scannerQueue;
+                    scannerWanted = true; reconcileScanner();
+                } else {
+                    await window.refreshScanner();
+                }
+            });
+            backgroundButton.addEventListener('click', async () => {
+                if (!owner) { showToast('Primero inicia sesión.', 'error'); return; }
+                if (backgroundActive) {
+                    window.GrafiplotScanner.postMessage(JSON.stringify({action:'stop'}));
+                } else {
+                    backgroundButton.disabled = true;
+                    try {
+                        backgroundActive = true;
+                        reconcileScanner(); await scannerQueue;
+                        window.GrafiplotScanner.postMessage(JSON.stringify({action:'start',front:cameraFacing === 'user'}));
+                    } catch (error) {
+                        window.grafiplotBackgroundState(false,false,error.message);
+                    } finally { backgroundButton.disabled = false; }
+                }
+            });
+            document.getElementById('camera-torch').addEventListener('click', async () => {
+                if (backgroundActive) {
+                    window.GrafiplotScanner.postMessage(JSON.stringify({action:'torch',torch:!torchActive}));
+                    return;
+                }
+                try {
+                    if (!isScannerRunning || !html5QrcodeScanner) throw new Error('Abre la cámara primero.');
+                    const caps = html5QrcodeScanner.getRunningTrackCapabilities();
+                    if (!caps.torch) throw new Error('Esta cámara no dispone de flash.');
+                    await html5QrcodeScanner.applyVideoConstraints({advanced:[{torch:!torchActive}]});
+                    torchActive = !torchActive;
+                    document.getElementById('camera-torch').textContent = torchActive ? 'Apagar flash' : 'Encender flash';
+                } catch (error) { showToast(error.message || 'No se pudo activar el flash.', 'error'); }
+            });
             initApp();
             
             const inpPrecio = document.getElementById('reg-precio');
