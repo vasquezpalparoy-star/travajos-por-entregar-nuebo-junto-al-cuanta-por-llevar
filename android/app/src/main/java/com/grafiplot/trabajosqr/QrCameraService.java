@@ -17,6 +17,19 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mlkit.vision.barcode.*;
 import com.google.mlkit.vision.barcode.common.Barcode;
 import com.google.mlkit.vision.common.InputImage;
+import android.graphics.Color;
+import android.graphics.PixelFormat;
+import android.provider.Settings;
+import android.view.*;
+import android.widget.*;
+import android.webkit.*;
+import android.net.Uri;
+import androidx.webkit.WebViewAssetLoader;
+import androidx.webkit.WebViewCompat;
+import androidx.webkit.WebViewFeature;
+import org.json.JSONObject;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -34,17 +47,26 @@ public class QrCameraService extends LifecycleService {
     private String lastCode = "";
     private long lastSeen;
     private int generation;
+    private WebView publisher;
+    private boolean publisherReady;
+    private final ArrayList<String> pendingCodes = new ArrayList<>();
+    private WindowManager windowManager;
+    private LinearLayout overlay;
+    private TextView overlayInfo;
+    private String overlayCode;
 
     @Override public void onCreate() {
         super.onCreate();
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Escáner de cámara activo", NotificationManager.IMPORTANCE_LOW));
         manager.createNotificationChannel(new NotificationChannel(ALERT_CHANNEL, "QR detectado", NotificationManager.IMPORTANCE_HIGH));
+        initPublisher();
         scanner = BarcodeScanning.getClient(new BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build());
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         super.onStartCommand(intent, flags, startId);
         if (intent == null || "STOP".equals(intent.getAction())) { stopSelf(); return START_NOT_STICKY; }
+        if ("HIDE_OVERLAY".equals(intent.getAction())) { removeOverlay(); return START_NOT_STICKY; }
         if ("TORCH".equals(intent.getAction())) {
             setTorch(intent.getBooleanExtra("torch", false));
             return START_NOT_STICKY;
@@ -105,7 +127,9 @@ public class QrCameraService extends LifecycleService {
                 boolean repeated = value.equals(lastCode) && now - lastSeen < 2000;
                 lastCode = value; lastSeen = now;
                 if (!repeated && running) {
+                    publishCode(value);
                     event(value, null);
+                    if (!MainActivity.visible) showAndOpen(value);
                     getSystemService(NotificationManager.class).notify(102,
                         new Notification.Builder(this, ALERT_CHANNEL)
                             .setSmallIcon(android.R.drawable.ic_menu_camera)
@@ -116,6 +140,82 @@ public class QrCameraService extends LifecycleService {
                 break;
             }
         }).addOnCompleteListener(task -> frame.close());
+    }
+    @SuppressLint("SetJavaScriptEnabled")
+    private void initPublisher() {
+        publisher = new WebView(this);
+        publisher.getSettings().setJavaScriptEnabled(true);
+        publisher.getSettings().setDomStorageEnabled(true);
+        publisher.getSettings().setAllowFileAccess(false);
+        publisher.getSettings().setAllowContentAccess(false);
+        WebViewAssetLoader loader = new WebViewAssetLoader.Builder().addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(this)).build();
+        publisher.setWebViewClient(new WebViewClient() {
+            @Override public WebResourceResponse shouldInterceptRequest(WebView v,WebResourceRequest r) { return loader.shouldInterceptRequest(r.getUrl()); }
+            @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r) { return true; }
+            @Override public void onPageFinished(WebView v,String url) {
+                publisherReady=true;
+                for (String code:new ArrayList<>(pendingCodes)) publishCode(code);
+                pendingCodes.clear();
+            }
+        });
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            WebViewCompat.addWebMessageListener(publisher,"GrafiplotService",Collections.singleton("https://appassets.androidplatform.net"),
+                (view,message,origin,mainFrame,reply) -> {
+                    if (!mainFrame) return;
+                    try {
+                        JSONObject data=new JSONObject(message.getData());
+                        if (overlayInfo!=null && data.optString("codigo").equals(overlayCode)) {
+                            String info=data.optString("error");
+                            if (info.isEmpty()) {
+                                info=data.optBoolean("encontrado") ? data.optString("nombre") + "\n" + data.optString("descripcion") + "\nTotal S/ " + data.optString("total") + " · A cuenta S/ " + data.optString("pago") : "Código libre. Completa los datos en la PC o en la aplicación.";
+                                info += "\nQR enviado a la PC.";
+                            }
+                            overlayInfo.setText(info);
+                        }
+                    } catch(Exception ignored) {}
+                });
+        }
+        publisher.loadUrl("https://appassets.androidplatform.net/assets/service-bridge.html");
+    }
+    private void publishCode(String code) {
+        if (!publisherReady) { if(pendingCodes.size()<10) pendingCodes.add(code); return; }
+        publisher.evaluateJavascript("window.enqueueQr && window.enqueueQr(" + JSONObject.quote(code) + ")",null);
+    }
+    private void removeOverlay() {
+        if (overlay!=null && windowManager!=null) {
+            try {windowManager.removeView(overlay);} catch(Exception ignored) {}
+        }
+        overlay=null;overlayInfo=null;overlayCode=null;
+    }
+    private void showAndOpen(String code) {
+        if (!Settings.canDrawOverlays(this) || !getSharedPreferences("grafiplot_camera",MODE_PRIVATE).getBoolean("auto_open",false)) return;
+        removeOverlay();
+        try {
+            windowManager=(WindowManager)getSystemService(WINDOW_SERVICE);
+            overlay=new LinearLayout(this);overlay.setOrientation(LinearLayout.VERTICAL);
+            int pad=(int)(16*getResources().getDisplayMetrics().density);
+            overlay.setPadding(pad,pad,pad,pad);overlay.setBackgroundColor(Color.WHITE);
+            TextView title=new TextView(this);title.setText("GRAFIPLOT · QR " + code);title.setTextColor(Color.rgb(180,20,30));title.setTextSize(22);
+            overlay.addView(title);
+            overlayInfo=new TextView(this);overlayInfo.setText("Abriendo ficha y enviando QR a la PC…");overlayInfo.setTextColor(Color.BLACK);overlayInfo.setTextSize(16);overlay.addView(overlayInfo);
+            overlayCode=code;
+            Button open=new Button(this);open.setText("Abrir ficha");open.setOnClickListener(v -> launchApp(code));overlay.addView(open);
+            Button close=new Button(this);close.setText("Cerrar cuadro");close.setOnClickListener(v -> removeOverlay());overlay.addView(close);
+            WindowManager.LayoutParams params=new WindowManager.LayoutParams(
+                (int)(getResources().getDisplayMetrics().widthPixels*0.9),WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,PixelFormat.TRANSLUCENT);
+            params.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL;params.y=pad*4;
+            windowManager.addView(overlay,params);
+            overlay.postDelayed(() -> launchApp(code),200);
+        } catch(Exception error) {removeOverlay();}
+    }
+    private void launchApp(String code) {
+        try {
+            Intent open=new Intent(this,MainActivity.class).putExtra("qr",code)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(open);
+        } catch(Exception ignored) {}
     }
     private void setTorch(boolean enable) {
         if (camera == null || !camera.getCameraInfo().hasFlashUnit()) {
@@ -135,6 +235,8 @@ public class QrCameraService extends LifecycleService {
     }
     @Override public void onDestroy() {
         running = false; torch = false; generation++;
+        removeOverlay();
+        if (publisher!=null) {publisher.destroy();publisher=null;}
         if (provider != null) provider.unbindAll();
         if (scanner != null) scanner.close();
         worker.shutdown();

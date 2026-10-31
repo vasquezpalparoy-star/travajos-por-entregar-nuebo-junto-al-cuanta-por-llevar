@@ -21,6 +21,7 @@ import java.io.OutputStream;
 public class MainActivity extends Activity {
     private WebView web;
     private PermissionRequest pendingCamera;
+    public static volatile boolean visible = false;
     private boolean foreground;
     private boolean startRequested;
     private boolean backgroundRequested;
@@ -92,7 +93,13 @@ public class MainActivity extends Activity {
                     try {
                         JSONObject data = new JSONObject(message.getData());
                         String action = data.getString("action");
-                        if ("stop".equals(action)) {
+                        if ("overlay".equals(action)) {
+                            boolean enable = data.optBoolean("enable", true);
+                            getSharedPreferences("grafiplot_camera",MODE_PRIVATE).edit().putBoolean("auto_open",enable).apply();
+                            if (enable && !android.provider.Settings.canDrawOverlays(this)) {
+                                startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:" + getPackageName())));
+                            } else syncOverlayState();
+                        } else if ("stop".equals(action)) {
                             startRequested = false; backgroundRequested = false;
                             stopService(new Intent(this, QrCameraService.class));
                             syncScannerState(null);
@@ -113,6 +120,7 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override public void onPageFinished(WebView v, String url) {
                 syncScannerState(null);
+                syncOverlayState();
                 if (pendingQr != null) { deliverQr(pendingQr); pendingQr = null; }
             }
             @Override public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest request) {
@@ -173,9 +181,14 @@ public class MainActivity extends Activity {
         web.evaluateJavascript("window.grafiplotBackgroundState && window.grafiplotBackgroundState(" + active + "," +
             QrCameraService.torch + "," + JSONObject.quote(message == null ? "" : message) + ")", null);
     }
+    private void syncOverlayState() {
+        if (web == null) return;
+        boolean allowed = android.provider.Settings.canDrawOverlays(this) && getSharedPreferences("grafiplot_camera",MODE_PRIVATE).getBoolean("auto_open",false);
+        web.evaluateJavascript("window.grafiplotOverlayState && window.grafiplotOverlayState(" + allowed + ")",null);
+    }
     private void deliverQr(String code) {
         if (web == null) { pendingQr = code; return; }
-        web.evaluateJavascript("window.grafiplotNativeScan && window.grafiplotNativeScan(" + JSONObject.quote(code) + ")", null);
+        web.evaluateJavascript("window.grafiplotNativeScan && window.grafiplotNativeScan(" + JSONObject.quote(code) + ",false)", null);
     }
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent); setIntent(intent);
@@ -248,6 +261,9 @@ public class MainActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         foreground = true;
+        visible = true;
+        if (QrCameraService.running) startService(new Intent(this,QrCameraService.class).setAction("HIDE_OVERLAY"));
+        syncOverlayState();
         if (!startRequested) backgroundRequested = QrCameraService.running;
         startBackgroundCamera();
         syncScannerState(null);
@@ -258,6 +274,7 @@ public class MainActivity extends Activity {
     }
     @Override protected void onPause() {
         foreground = false;
+        visible = false;
         if (web != null) {
             web.evaluateJavascript("window.grafiplotSetForeground && window.grafiplotSetForeground(false)", null);
             web.onPause();

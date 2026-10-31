@@ -103,6 +103,8 @@
                     </select>
                 </label>
                 <button id="camera-torch" type="button" class="border rounded-lg p-2 bg-amber-100 text-xs font-bold">Encender flash</button>
+                <button id="camera-overlay" type="button" class="hidden border rounded-lg p-2 bg-purple-100 text-xs font-bold">Permitir abrir sobre otras apps</button>
+                <button id="pc-qr-receiver" type="button" class="hidden border rounded-lg p-2 bg-green-100 text-xs font-bold">Recepción QR PC: activa</button>
                 <button id="camera-background" type="button" class="hidden border rounded-lg p-2 bg-blue-100 text-xs font-bold">Activar segundo plano</button>
                 <p id="pc-qr-status" class="w-full text-xs font-bold text-blue-700" role="status">Para recibir este QR en la PC, abre la página de cuentas con el mismo correo.</p>
                 <p id="camera-mode-status" class="w-full text-xs text-gray-600">La cámara seleccionada debe disponer de flash para poder encenderlo.</p>
@@ -299,6 +301,12 @@
     <!-- Canvas ocultos para PDFs -->
     <canvas id="barcode-canvas" class="hidden"></canvas>
 
+    <div id="pc-qr-editor" class="hidden fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Completar datos QR">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[94vh] overflow-y-auto p-4">
+            <div class="flex justify-between items-center mb-3"><h2 id="pc-qr-editor-title" class="font-black text-xl">Completar datos QR</h2><button type="button" onclick="closePcQrEditor()" class="font-bold p-2">Cerrar ✕</button></div>
+            <div id="pc-qr-editor-body"></div>
+        </div>
+    </div>
     <div id="cloud-gate" class="fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3">
             <h2 class="text-xl font-black text-slate-900">GRAFIPLOT QR · Recibos</h2>
@@ -321,6 +329,12 @@
         let backgroundActive = false;
         let torchActive = false;
         let pendingNativeQr = null;
+        let pendingNativePublish = true;
+        let nativeOverlayAllowed = false;
+        const desktopQrMode = !androidScannerMode && !/Android|iPhone|iPad/i.test(navigator.userAgent);
+        let pcReceiverEnabled = desktopQrMode;
+        let pcReceiverBusy = false;
+        let pcPanelAnchor = null;
         let cameraFacing = localStorage.getItem('grafiplot_camera_facing') || 'environment';
         let appForeground = true;
         window.grafiplotBackgroundState = (active, torch, message) => {
@@ -333,8 +347,9 @@
                 : 'Segundo plano desactivado. La cámara funciona mientras la app está visible.');
             reconcileScanner();
         };
-        window.grafiplotNativeScan = (code) => {
+        window.grafiplotNativeScan = (code, publish = true) => {
             pendingNativeQr = String(code);
+            pendingNativePublish = publish;
             if (owner) refreshRecords();
         };
         let scannerStarting = false;
@@ -378,6 +393,66 @@
         const CLOUD_URL = 'https://gyvztqpvgtinxoqhyfbw.supabase.co';
         const CLOUD_KEY = 'sb_publishable_m5tDCWoaiu-xP-lezwd3Lg_rlUfq118';
 
+        window.grafiplotOverlayState = allowed => {
+            nativeOverlayAllowed = allowed;
+            document.getElementById('camera-overlay').textContent = allowed ? 'Apertura sobre otras apps: activada' : 'Permitir abrir sobre otras apps';
+        };
+        window.closePcQrEditor = () => {
+            const panel = document.querySelector('.panel-registro');
+            if (pcPanelAnchor && panel) pcPanelAnchor.replaceWith(panel);
+            pcPanelAnchor = null;
+            document.getElementById('pc-qr-editor').classList.add('hidden');
+            document.title = 'Sistema de Control - Grafiplot';
+        };
+        function openPcQrEditor(code) {
+            window.hideScanResultModal();
+            const panel = document.querySelector('.panel-registro');
+            if (!pcPanelAnchor) {
+                pcPanelAnchor = document.createElement('div');
+                panel.replaceWith(pcPanelAnchor);
+                document.getElementById('pc-qr-editor-body').appendChild(panel);
+            }
+            document.getElementById('pc-qr-editor').classList.remove('hidden');
+            const record = records.find(r => r.codigo === code);
+            if (record) window.editRecord(record.id);
+            else {
+                editingRecordId = null;
+                document.getElementById('register-form').reset();
+                document.getElementById('edit-badge').classList.add('hidden');
+                document.getElementById('btn-save-record').innerHTML = 'Guardar Registro';
+                updateAvailableCodesSelect();
+                document.getElementById('reg-codigo').value = code;
+                document.getElementById('reg-hojas').value = 1;
+                calcularCambio();
+            }
+            document.getElementById('pc-qr-editor-title').textContent = 'QR ' + code + (record ? ' · Editar cuenta' : ' · Completar datos');
+            document.title = 'QR ' + code + ' · Completar datos';
+            document.getElementById('reg-nombre').focus();
+        }
+        async function pollPcQr() {
+            if (!pcReceiverEnabled || !owner || !api || pcReceiverBusy || !document.getElementById('pc-qr-editor').classList.contains('hidden')) return;
+            pcReceiverBusy = true;
+            const status = document.getElementById('pc-qr-status');
+            try {
+                const {data:events,error} = await api.from('grafiplot_qr_lecturas').select('id,codigo,leido_en')
+                    .eq('user_id',owner.id).is('consumido_en',null).order('leido_en',{ascending:false}).limit(1);
+                if (error) throw error;
+                if (!events?.length) { status.textContent = 'PC conectada: esperando QR del celular…'; return; }
+                const event = events[0];
+                const {data:claimed,error:claimError} = await api.from('grafiplot_qr_lecturas')
+                    .update({consumido_en:new Date().toISOString()}).eq('id',event.id)
+                    .eq('user_id',owner.id).is('consumido_en',null).select('id');
+                if (claimError) throw claimError;
+                if (!claimed?.length) return;
+                await api.from('grafiplot_qr_lecturas').update({consumido_en:new Date().toISOString()})
+                    .eq('user_id',owner.id).lte('leido_en',event.leido_en).is('consumido_en',null);
+                await refreshRecords();
+                openPcQrEditor(event.codigo);
+                status.textContent = 'QR ' + event.codigo + ': cuadro de datos abierto en esta PC.';
+            } catch(error) {status.textContent = 'Recepción PC: ' + error.message;}
+            finally {pcReceiverBusy=false;}
+        }
+
         function calcularCambio() {
             const precio = parseFloat(document.getElementById('reg-precio').value) || 0;
             const pago = parseFloat(document.getElementById('reg-pago').value) || 0;
@@ -411,7 +486,7 @@
             records = (data || []).map(toRecord);
             if (pendingNativeQr !== null) {
                 const code = pendingNativeQr; pendingNativeQr = null;
-                window.showScanResultModal(code);
+                window.showScanResultModal(code, pendingNativePublish);
             }
             reconcileScanner();
             updateStatus('Sincronizado', 'bg-green-500', 'text-green-700');
@@ -683,6 +758,7 @@
                     showToast(`Registrado con éxito (${data.codigo})`);
                 }
                 await refreshRecords();
+                if (desktopQrMode && pcPanelAnchor) window.closePcQrEditor();
 
                 // Limpiar formulario
                 document.getElementById('register-form').reset();
@@ -1110,9 +1186,9 @@
         window.showClearModal = () => document.getElementById('clear-modal').classList.remove('hidden');
         window.hideClearModal = () => document.getElementById('clear-modal').classList.add('hidden');
         
-        window.showScanResultModal = function(decodedText) {
+        window.showScanResultModal = function(decodedText, publishToPc = true) {
             const rawText = (decodedText || '').trim();
-            if (api && owner && /^\d{1,3}$/.test(rawText)) {
+            if (publishToPc && api && owner && /^\d{1,3}$/.test(rawText)) {
                 const codigo = String(parseInt(rawText,10)).padStart(3,'0');
                 if (Number(codigo) >= 1 && Number(codigo) <= TOTAL_CODES) {
                     const pcStatus = document.getElementById('pc-qr-status');
@@ -1429,6 +1505,21 @@
         };
 
         window.addEventListener('DOMContentLoaded', () => {
+            const receiverButton = document.getElementById('pc-qr-receiver');
+            if (desktopQrMode) {
+                receiverButton.classList.remove('hidden');
+                receiverButton.addEventListener('click', () => {
+                    pcReceiverEnabled = !pcReceiverEnabled;
+                    receiverButton.textContent = pcReceiverEnabled ? 'Recepción QR PC: activa' : 'Activar recepción QR PC';
+                    pollPcQr();
+                });
+                setInterval(pollPcQr,1500);
+            }
+            const overlayButton = document.getElementById('camera-overlay');
+            if (androidScannerMode && window.GrafiplotScanner?.postMessage) {
+                overlayButton.classList.remove('hidden');
+                overlayButton.addEventListener('click', () => window.GrafiplotScanner.postMessage(JSON.stringify({action:'overlay',enable:!nativeOverlayAllowed})));
+            }
             const facingInput = document.getElementById('camera-facing');
             const backgroundButton = document.getElementById('camera-background');
             facingInput.value = cameraFacing;
