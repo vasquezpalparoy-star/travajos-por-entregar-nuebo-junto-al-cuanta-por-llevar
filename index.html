@@ -297,12 +297,14 @@
                 <input id="cloud-confirm" type="password" placeholder="Repite tu contraseña" autocomplete="new-password" class="hidden w-full border rounded-xl p-3 text-sm">
                 <p id="cloud-message" class="text-sm text-red-600" role="alert"></p>
                 <button id="cloud-submit" type="submit" class="w-full bg-red-600 text-white font-bold p-3 rounded-xl">Entrar y sincronizar</button>
+                <button id="cloud-forgot" type="button" class="w-full text-blue-700 p-2">Olvidé mi contraseña</button>
                 <button id="cloud-mode" type="button" class="w-full text-blue-700 font-bold p-2">Crear una cuenta nueva</button>
             </form>
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script type="module">
+        let recoveringPassword = new URLSearchParams(location.hash.slice(1)).get('type') === 'recovery';
         let api = null;
         let owner = null;
         let records = [];
@@ -363,14 +365,21 @@
             if (!url || !key) { gate.classList.remove('hidden'); return; }
             try {
                 api = window.supabase.createClient(url, key);
+                api.auth.onAuthStateChange((event) => {
+                    if (event === 'PASSWORD_RECOVERY') {
+                        recoveringPassword = true;
+                        showRecoveryForm();
+                    }
+                });
                 const {data:{session}, error} = await api.auth.getSession();
                 if (error) throw error;
                 owner = session?.user || null;
-                if (owner) { gate.classList.add('hidden'); await refreshRecords(); }
+                if (recoveringPassword) showRecoveryForm();
+                else if (owner) { gate.classList.add('hidden'); await refreshRecords(); }
                 else gate.classList.remove('hidden');
                 api.auth.onAuthStateChange((_event, sessionNow) => {
                     owner = sessionNow?.user || null;
-                    gate.classList.toggle('hidden', !!owner);
+                    gate.classList.toggle('hidden', !!owner && !recoveringPassword);
                     if (owner) refreshRecords(); else { records = []; handleSearch(); }
                 });
                 setInterval(refreshRecords, 6000);
@@ -381,6 +390,41 @@
                 gate.classList.remove('hidden');
             }
         }
+
+        function showRecoveryForm() {
+            gate.classList.remove('hidden');
+            document.querySelector('#cloud-gate h2').textContent = 'Nueva contraseña';
+            document.getElementById('cloud-email').required = false;
+            document.getElementById('cloud-email').classList.add('hidden');
+            cloudPassword.value = '';
+            cloudPassword.minLength = 8;
+            cloudPassword.autocomplete = 'new-password';
+            cloudConfirm.value = '';
+            cloudConfirm.classList.remove('hidden');
+            cloudConfirm.required = true;
+            cloudSubmit.textContent = 'Guardar nueva contraseña';
+            cloudMode.classList.add('hidden');
+            document.getElementById('cloud-forgot').classList.add('hidden');
+            cloudMessage.textContent = 'Elige y repite una contraseña de al menos 8 caracteres.';
+        }
+
+        document.getElementById('cloud-forgot').addEventListener('click', async (event) => {
+            const emailInput = document.getElementById('cloud-email');
+            if (!emailInput.reportValidity()) return;
+            const button = event.currentTarget;
+            button.disabled = true;
+            try {
+                if (!api) throw new Error('La conexión aún no está lista. Recarga la página.');
+                const {error} = await api.auth.resetPasswordForEmail(emailInput.value.trim(), {
+                    redirectTo: location.origin + location.pathname
+                });
+                if (error) throw error;
+                cloudMessage.textContent = 'Si el correo está registrado, recibirás un enlace para cambiar tu contraseña. Revisa también Spam.';
+            } catch (error) {
+                cloudMessage.textContent = error.message === 'Failed to fetch'
+                    ? 'No se pudo conectar. Comprueba Internet.' : error.message;
+            } finally { button.disabled = false; }
+        });
 
         let creatingAccount = false;
         const cloudSubmit = document.getElementById('cloud-submit');
@@ -406,9 +450,20 @@
             cloudSubmit.disabled = true;
             cloudMode.disabled = true;
             try {
-                if (creatingAccount && cloudPassword.value !== cloudConfirm.value) throw new Error('Las contraseñas no coinciden.');
+                if ((creatingAccount || recoveringPassword) && cloudPassword.value !== cloudConfirm.value) throw new Error('Las contraseñas no coinciden.');
                 if (!window.supabase?.createClient) throw new Error('No se pudo cargar la conexión. Recarga la página.');
                 if (!url.startsWith('https://')) throw new Error('La URL debe comenzar con https://');
+                if (recoveringPassword) {
+                    if (!api) throw new Error('Abre de nuevo el enlace de recuperación de tu correo.');
+                    const {error} = await api.auth.updateUser({password: cloudPassword.value});
+                    if (error) throw error;
+                    cloudPassword.value = '';
+                    cloudConfirm.value = '';
+                    recoveringPassword = false;
+                    history.replaceState(null, '', location.pathname);
+                    location.reload();
+                    return;
+                }
                 const changed = !api || url !== localStorage.getItem('grafiplot_supabase_url') || key !== localStorage.getItem('grafiplot_supabase_key');
                 if (changed) api = window.supabase.createClient(url, key);
                 const credentials = {
