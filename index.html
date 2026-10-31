@@ -104,6 +104,7 @@
                 </label>
                 <button id="camera-torch" type="button" class="border rounded-lg p-2 bg-amber-100 text-xs font-bold">Encender flash</button>
                 <button id="camera-background" type="button" class="hidden border rounded-lg p-2 bg-blue-100 text-xs font-bold">Activar segundo plano</button>
+                <p id="pc-qr-status" class="w-full text-xs font-bold text-blue-700" role="status">Para recibir este QR en la PC, abre la página de cuentas con el mismo correo.</p>
                 <p id="camera-mode-status" class="w-full text-xs text-gray-600">La cámara seleccionada debe disponer de flash para poder encenderlo.</p>
             </div>
 
@@ -1111,6 +1112,18 @@
         
         window.showScanResultModal = function(decodedText) {
             const rawText = (decodedText || '').trim();
+            if (api && owner && /^\d{1,3}$/.test(rawText)) {
+                const codigo = String(parseInt(rawText,10)).padStart(3,'0');
+                if (Number(codigo) >= 1 && Number(codigo) <= TOTAL_CODES) {
+                    const pcStatus = document.getElementById('pc-qr-status');
+                    pcStatus.textContent = 'Enviando QR ' + codigo + ' a la PC…';
+                    api.from('grafiplot_qr_lecturas').insert({user_id:owner.id,codigo}).then(({error}) => {
+                        pcStatus.textContent = error
+                            ? 'No se pudo enviar el QR a la PC: ' + error.message
+                            : 'QR ' + codigo + ' enviado. La PC lo abrirá si está conectada y tiene la recepción activa.';
+                    });
+                }
+            }
             
             let record = records.find(r => r.codigo && (r.codigo === rawText || r.codigo.toLowerCase() === rawText.toLowerCase()));
             
