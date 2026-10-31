@@ -313,8 +313,8 @@
 
         const gate = document.getElementById('cloud-gate');
         const cloudMessage = document.getElementById('cloud-message');
-        const CLOUD_URL = 'https://pdszypigdjnfnbldecah.supabase.co';
-        const CLOUD_KEY = 'sb_publishable_7qEw0IPoItW_hXHZVH_HAA_YR419f1J';
+        const CLOUD_URL = 'https://gyvztqpvgtinxoqhyfbw.supabase.co';
+        const CLOUD_KEY = 'sb_publishable_m5tDCWoaiu-xP-lezwd3Lg_rlUfq118';
 
         function calcularCambio() {
             const precio = parseFloat(document.getElementById('reg-precio').value) || 0;
@@ -433,7 +433,7 @@
                 await refreshRecords();
                 // Reinitialize once after first configuration to attach session listeners.
                 if (changed) location.reload();
-            } catch (error) { cloudMessage.textContent = error.message || 'No se pudo completar el acceso'; }
+            } catch (error) { cloudMessage.textContent = (error.message === 'Failed to fetch' ? 'No se pudo conectar con el servidor. Comprueba Internet y vuelve a intentarlo.' : error.message) || 'No se pudo completar el acceso'; }
             finally { cloudSubmit.disabled = false; cloudMode.disabled = false; }
         });
 
