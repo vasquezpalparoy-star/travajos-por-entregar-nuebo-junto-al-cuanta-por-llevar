@@ -1,0 +1,39 @@
+name: Compilar APK Trabajos QR
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', 'index.html', '.github/workflows/android-apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Preparar interfaz
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp index.html android/app/src/main/assets/index.html
+      - name: Compilar y revisar
+        working-directory: android
+        run: gradle assembleDebug lintDebug --no-daemon
+      - name: Preparar APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk GRAFIPLOT_Trabajos_QR.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GRAFIPLOT_Trabajos_QR
+          path: GRAFIPLOT_Trabajos_QR.apk
+      - name: Publicar instalador
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "apk-1.0-${GITHUB_RUN_NUMBER}" GRAFIPLOT_Trabajos_QR.apk --title "GRAFIPLOT Trabajos QR APK 1.0" --notes "Android 8 o superior. Requiere Internet y permiso de cámara. Escaneo automático al iniciar sesión; cámara activa mientras la app está visible. Al minimizar o bloquear se detiene. APK de instalación directa firmada para pruebas."

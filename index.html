@@ -305,6 +305,34 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script type="module">
         let recoveringPassword = new URLSearchParams(location.hash.slice(1)).get('type') === 'recovery';
+        const androidScannerMode = navigator.userAgent.includes('GrafiplotAndroid/');
+        let appForeground = true;
+        let scannerStarting = false;
+        let scannerWanted = true;
+        let scannerQueue = Promise.resolve();
+        window.grafiplotSetForeground = (visible) => {
+            appForeground = visible;
+            if (visible) scannerWanted = true;
+            reconcileScanner();
+        };
+        function reconcileScanner() {
+            if (!androidScannerMode) return;
+            scannerQueue = scannerQueue.catch(() => {}).then(async () => {
+                const shouldRun = appForeground && scannerWanted && !!owner && !recoveringPassword;
+                if (shouldRun && !isScannerRunning && !scannerStarting) {
+                    await window.startScannerInstance();
+                } else if (!shouldRun && isScannerRunning && html5QrcodeScanner) {
+                    await html5QrcodeScanner.stop();
+                    html5QrcodeScanner.clear();
+                    isScannerRunning = false;
+                    document.getElementById('scanner-container').classList.add('hidden');
+                }
+            }).catch(error => console.warn('Cámara:', error));
+        }
+        document.addEventListener('visibilitychange', () => {
+            appForeground = !document.hidden;
+            reconcileScanner();
+        });
         let api = null;
         let owner = null;
         let records = [];
@@ -349,6 +377,7 @@
                 .order('guardado_en', {ascending:false}).limit(500);
             if (error) { updateStatus('Error de datos', 'bg-red-500'); console.error(error); return; }
             records = (data || []).map(toRecord);
+            reconcileScanner();
             updateStatus('Sincronizado', 'bg-green-500', 'text-green-700');
             updateAvailableCodesSelect();
             handleSearch();
@@ -380,7 +409,7 @@
                 api.auth.onAuthStateChange((_event, sessionNow) => {
                     owner = sessionNow?.user || null;
                     gate.classList.toggle('hidden', !!owner && !recoveringPassword);
-                    if (owner) refreshRecords(); else { records = []; handleSearch(); }
+                    if (owner) refreshRecords(); else { records = []; handleSearch(); reconcileScanner(); }
                 });
                 setInterval(refreshRecords, 6000);
                 window.addEventListener('focus', refreshRecords);
@@ -416,7 +445,7 @@
             try {
                 if (!api) throw new Error('La conexión aún no está lista. Recarga la página.');
                 const {error} = await api.auth.resetPasswordForEmail(emailInput.value.trim(), {
-                    redirectTo: location.origin + location.pathname
+                    redirectTo: 'https://vasquezpalparoy-star.github.io/travajos-por-entregar-nuebo-junto-al-cuanta-por-llevar/'
                 });
                 if (error) throw error;
                 cloudMessage.textContent = 'Si el correo está registrado, recibirás un enlace para cambiar tu contraseña. Revisa también Spam.';
@@ -1223,6 +1252,8 @@
         };
 
         window.startScannerInstance = function() {
+            if (isScannerRunning || scannerStarting) return Promise.resolve();
+            scannerStarting = true;
             const container = document.getElementById('scanner-container');
             const btnText = document.getElementById('scanner-btn-text');
 
@@ -1233,6 +1264,11 @@
             container.classList.remove('hidden');
             if (btnText) btnText.textContent = "Iniciando...";
 
+            if (typeof Html5Qrcode === 'undefined') {
+                scannerStarting = false;
+                showToast('No se pudo cargar el escáner. Comprueba Internet y recarga.', 'error');
+                return Promise.resolve();
+            }
             html5QrcodeScanner = new Html5Qrcode("reader");
 
             const config = {
@@ -1248,10 +1284,11 @@
                 }
             };
 
-            html5QrcodeScanner.start(
+            return html5QrcodeScanner.start(
                 { facingMode: "environment" },
                 config,
                 (decodedText) => {
+                    if (androidScannerMode && (!appForeground || !document.getElementById('scan-result-modal').classList.contains('hidden'))) return;
                     try {
                         const ctx = new (window.AudioContext || window.webkitAudioContext)();
                         const osc = ctx.createOscillator();
@@ -1263,13 +1300,15 @@
                     } catch (e) {}
 
                     showScanResultModal(decodedText);
-                    toggleScanner();
+                    if (!androidScannerMode) toggleScanner();
                 },
                 () => {}
             ).then(() => {
+                scannerStarting = false;
                 isScannerRunning = true;
                 if (btnText) btnText.textContent = "Cerrar Cámara";
             }).catch((err) => {
+                scannerStarting = false;
                 console.error("Error iniciando cámara:", err);
                 showToast("No se pudo iniciar la cámara.", "error");
                 container.classList.add('hidden');
@@ -1293,6 +1332,7 @@
         };
 
         window.toggleScanner = function() {
+            if (androidScannerMode) { scannerWanted = !isScannerRunning; reconcileScanner(); return; }
             const container = document.getElementById('scanner-container');
             const btnText = document.getElementById('scanner-btn-text');
 
