@@ -40,9 +40,20 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: GRAFIPLOT_QR_Directo
+          overwrite: true
           path: GRAFIPLOT_QR_Directo.apk
       - name: Publicar instalador
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "apk-directo-1.5-${GITHUB_RUN_NUMBER}" GRAFIPLOT_QR_Directo.apk --title "GRAFIPLOT QR Directo 1.5" --notes "Android 8 o superior. Requiere Internet y permiso de cámara. Escaneo automático al iniciar sesión; cámara activa mientras la app está visible. Al minimizar o bloquear se detiene. Acceso por correo y contraseña, sin IP. Recibos PDF con selector de destino Android. Cámara delantera/trasera, flash y escáner en servicio con notificación. Con permiso Mostrar sobre otras aplicaciones, aparece cuadro flotante y se solicita apertura de la ficha. Envío del QR a PC también desde segundo plano. Notificación con nombre del cliente, total, adelanto y deuda del QR leído. Desde la ficha QR: eliminar deuda marcándola pagada y editar total, pago o saldo; sincroniza con PC. No se inicia al reiniciar el teléfono."
+          release_tag="apk-directo-1.5-${GITHUB_RUN_NUMBER}"
+          for publish_attempt in 1 2 3; do
+            if ! gh release view "$release_tag" >/dev/null 2>&1; then
+              gh release create "$release_tag" --target "$GITHUB_SHA" --title "GRAFIPLOT QR Directo 1.5" --notes "Desde la ficha QR: eliminar deuda marcándola pagada y editar total, pago o saldo. Sincronización con PC y actualización de notificaciones. Conserva cámara delantera/trasera, flash, recibos PDF y modo de segundo plano." || true
+            fi
+            if gh release upload "$release_tag" GRAFIPLOT_QR_Directo.apk --clobber; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
