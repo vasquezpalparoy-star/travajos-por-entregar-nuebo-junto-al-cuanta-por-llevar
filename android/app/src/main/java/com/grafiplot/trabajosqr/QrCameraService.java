@@ -67,6 +67,12 @@ public class QrCameraService extends LifecycleService {
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         super.onStartCommand(intent, flags, startId);
         if (intent == null || "STOP".equals(intent.getAction())) { stopSelf(); return START_NOT_STICKY; }
+        if ("REFRESH_DEBT".equals(intent.getAction())) {
+            String code=intent.getStringExtra("codigo");
+            if (publisherReady && publisher != null && code != null && code.matches("[0-9]{3}"))
+                publisher.evaluateJavascript("window.refreshQrDebt && window.refreshQrDebt(" + JSONObject.quote(code) + ")",null);
+            return START_NOT_STICKY;
+        }
         if ("HIDE_OVERLAY".equals(intent.getAction())) { removeOverlay(); return START_NOT_STICKY; }
         if ("TORCH".equals(intent.getAction())) {
             setTorch(intent.getBooleanExtra("torch", false));

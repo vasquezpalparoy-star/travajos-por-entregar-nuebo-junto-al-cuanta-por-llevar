@@ -307,6 +307,18 @@
             <div id="pc-qr-editor-body"></div>
         </div>
     </div>
+    <div id="debt-editor-modal" class="hidden fixed inset-0 z-[110] bg-black/70 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="debt-editor-title">
+        <form id="debt-editor-form" class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-3 max-h-[92vh] overflow-y-auto">
+            <div class="flex justify-between items-center"><h2 id="debt-editor-title" class="font-black text-xl">Editar deuda</h2><button id="debt-editor-close" type="button" class="p-2 font-bold" aria-label="Cerrar">✕</button></div>
+            <p id="debt-editor-client" class="text-sm font-bold"></p>
+            <p id="debt-editor-help" class="text-sm text-gray-600"></p>
+            <label class="block text-sm font-bold">Total del trabajo (S/)<input id="debt-total" type="number" min="0" step="0.01" required class="block w-full border-2 rounded-xl p-3 mt-1"></label>
+            <label class="block text-sm font-bold">Monto pagado (S/)<input id="debt-paid" type="number" min="0" step="0.01" required class="block w-full border-2 rounded-xl p-3 mt-1"></label>
+            <label class="block text-sm font-bold text-red-700">Deuda pendiente (S/)<input id="debt-balance" type="number" min="0" step="0.01" required class="block w-full border-2 border-red-200 rounded-xl p-3 mt-1"></label>
+            <p id="debt-editor-message" class="text-sm text-red-700" role="alert"></p>
+            <button id="debt-editor-save" type="submit" class="w-full bg-blue-700 text-white font-bold rounded-xl p-3">Guardar cambios</button>
+        </form>
+    </div>
     <div id="cloud-gate" class="fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3">
             <h2 class="text-xl font-black text-slate-900">GRAFIPLOT QR · Recibos</h2>
@@ -1317,6 +1329,10 @@
                         </div>
                     </div>
                     
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <button type="button" onclick="openDebtEditor('${record.id}', 'paid')" ${Number(record.pago || 0) >= Number(record.precio || 0) ? 'disabled' : ''} class="bg-green-700 text-white font-bold p-3 rounded-xl text-xs disabled:opacity-40">✓ Eliminar deuda · Pagado</button>
+                        <button type="button" onclick="openDebtEditor('${record.id}', 'edit')" class="bg-amber-100 text-amber-900 font-bold p-3 rounded-xl text-xs">✎ Editar deuda</button>
+                    </div>
                     <div class="grid grid-cols-2 gap-2">
                         <a href="${waLink}" target="_blank" class="${!waNumber ? 'pointer-events-none opacity-50' : ''} w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md text-xs flex justify-center items-center gap-1">
                             💬 Contactar
@@ -1354,6 +1370,112 @@
             }
             document.getElementById('scan-result-modal').classList.remove('hidden');
         };
+
+        let debtSnapshot = null;
+        let debtSaving = false;
+        let debtMode = 'edit';
+        const cents = value => Math.round(Number(value) * 100);
+        function setDebtEditorBusy(busy) {
+            debtSaving = busy;
+            ['debt-total','debt-paid','debt-balance','debt-editor-save','debt-editor-close'].forEach(id => {
+                document.getElementById(id).disabled = busy || (debtMode === 'paid' && ['debt-total','debt-paid','debt-balance'].includes(id));
+            });
+        }
+        window.openDebtEditor = async (id, mode = 'edit') => {
+            if (!owner || !api || debtSaving) return;
+            debtMode = mode;
+            debtSnapshot = null;
+            document.getElementById('debt-editor-modal').classList.remove('hidden');
+            document.getElementById('debt-editor-title').textContent = mode === 'paid' ? 'Eliminar deuda · Marcar pagado' : 'Editar deuda';
+            document.getElementById('debt-editor-message').textContent = '';
+            document.getElementById('debt-editor-client').textContent = 'Cargando cuenta…';
+            setDebtEditorBusy(true);
+            try {
+                const {data,error} = await api.from('pedidos_pendientes').select('*')
+                    .eq('id',id).eq('user_id',owner.id).eq('estado','pendiente').single();
+                if (error) throw error;
+                debtSnapshot = data;
+                document.getElementById('debt-balance').setCustomValidity('');
+                const total = Number(data.total)||0, paid = Number(data.pago)||0;
+                document.getElementById('debt-editor-client').textContent = 'QR ' + (data.codigo || '') + ' · ' + (data.nombre || 'Cliente');
+                document.getElementById('debt-editor-help').textContent = mode === 'paid'
+                    ? 'Al confirmar, el saldo quedará en cero. Se conservarán la cuenta y el código QR.'
+                    : 'Puedes editar total y pagado, o escribir directamente la deuda pendiente.';
+                document.getElementById('debt-total').value = total.toFixed(2);
+                document.getElementById('debt-paid').value = (mode === 'paid' ? Math.max(total,paid) : paid).toFixed(2);
+                document.getElementById('debt-balance').value = (mode === 'paid' ? 0 : Math.max(0,total-paid)).toFixed(2);
+                document.getElementById('debt-editor-save').textContent = mode === 'paid' ? 'Confirmar: dejar deuda en cero' : 'Guardar cambios';
+            } catch(error) {
+                document.getElementById('debt-editor-message').textContent = error.message || 'No se pudo cargar esta cuenta.';
+            } finally {setDebtEditorBusy(false);document.getElementById('debt-editor-save').disabled = !debtSnapshot;}
+        };
+        document.getElementById('debt-editor-close').addEventListener('click', () => {
+            if (debtSaving) return;
+            document.getElementById('debt-editor-modal').classList.add('hidden');
+            debtSnapshot = null;
+        });
+        function recalculateDebt(source) {
+            const total = cents(document.getElementById('debt-total').value);
+            const paidInput = document.getElementById('debt-paid');
+            const balanceInput = document.getElementById('debt-balance');
+            balanceInput.setCustomValidity('');
+            if (source === 'balance') {
+                const balance = cents(balanceInput.value);
+                if (!Number.isFinite(balance) || balance < 0 || balance > total) {
+                    balanceInput.setCustomValidity('La deuda debe estar entre cero y el total del trabajo.');
+                    return;
+                }
+                paidInput.value = ((total-balance)/100).toFixed(2);
+            } else {
+                balanceInput.value = (Math.max(0,total-cents(paidInput.value))/100).toFixed(2);
+            }
+        }
+        document.getElementById('debt-total').addEventListener('input', () => recalculateDebt('total'));
+        document.getElementById('debt-paid').addEventListener('input', () => recalculateDebt('paid'));
+        document.getElementById('debt-balance').addEventListener('input', () => recalculateDebt('balance'));
+        document.getElementById('debt-editor-form').addEventListener('submit', async event => {
+            event.preventDefault();
+            if (!debtSnapshot || debtSaving || !owner || !api) return;
+            const totalCents = cents(document.getElementById('debt-total').value);
+            const paidCents = cents(document.getElementById('debt-paid').value);
+            const balanceCents = cents(document.getElementById('debt-balance').value);
+            const message = document.getElementById('debt-editor-message');
+            if (![totalCents,paidCents,balanceCents].every(Number.isSafeInteger) || totalCents < 0 || paidCents < 0 ||
+                balanceCents !== Math.max(0,totalCents-paidCents)) {
+                message.textContent = 'Revisa los montos: la deuda debe corresponder al total menos lo pagado.'; return;
+            }
+            const snapshot = debtSnapshot;
+            setDebtEditorBusy(true); message.textContent='';
+            try {
+                const payload = {pago:paidCents/100};
+                if (totalCents !== cents(snapshot.total)) {
+                    payload.total = totalCents/100;
+                    const baseItems = (snapshot.items || []).filter(item => item.name !== 'Ajuste de precio');
+                    const oldAdjustment = (snapshot.items || []).filter(item => item.name === 'Ajuste de precio')
+                        .reduce((sum,item) => sum + (Number(item.price)||0),0);
+                    const difference = Math.round((payload.total - Number(snapshot.total) + oldAdjustment)*100)/100;
+                    payload.items = !(snapshot.items || []).length
+                        ? [{name:snapshot.descripcion || 'Trabajo QR',price:payload.total,quantities:['1'],isCustom:true}]
+                        : difference ? [...baseItems,{name:'Ajuste de precio',price:difference,quantities:['1'],isCustom:true}] : baseItems;
+                }
+                const {data,error} = await api.from('pedidos_pendientes').update(payload)
+                    .eq('id',snapshot.id).eq('user_id',owner.id).eq('estado','pendiente')
+                    .eq('total',snapshot.total).eq('pago',snapshot.pago).select('*').maybeSingle();
+                if (error) throw error;
+                if (!data) throw new Error('La cuenta cambió en otro dispositivo. Cierra este cuadro y vuelve a abrir Editar deuda.');
+                const updated = toRecord(data);
+                records = records.map(record => record.id === updated.id ? updated : record);
+                document.getElementById('debt-editor-modal').classList.add('hidden');
+                debtSnapshot = null;
+                window.showScanResultModal(updated.codigo, false);
+                handleSearch();
+                if (androidScannerMode && window.GrafiplotScanner?.postMessage) {
+                    window.GrafiplotScanner.postMessage(JSON.stringify({action:'refreshDebt',codigo:updated.codigo}));
+                }
+                showToast(balanceCents === 0 ? 'Deuda en cero. Cuenta sincronizada.' : 'Deuda actualizada y sincronizada.','success');
+            } catch(error) {message.textContent=error.message || 'No se pudo guardar la deuda.';}
+            finally {setDebtEditorBusy(false);}
+        });
 
         window.hideScanResultModal = () => document.getElementById('scan-result-modal').classList.add('hidden');
 

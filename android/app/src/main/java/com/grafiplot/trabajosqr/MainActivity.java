@@ -93,7 +93,12 @@ public class MainActivity extends Activity {
                     try {
                         JSONObject data = new JSONObject(message.getData());
                         String action = data.getString("action");
-                        if ("overlay".equals(action)) {
+                        if ("refreshDebt".equals(action)) {
+                            String code = data.optString("codigo");
+                            if (QrCameraService.running && code.matches("[0-9]{3}")) {
+                                startService(new Intent(this,QrCameraService.class).setAction("REFRESH_DEBT").putExtra("codigo",code));
+                            }
+                        } else if ("overlay".equals(action)) {
                             boolean enable = data.optBoolean("enable", true);
                             getSharedPreferences("grafiplot_camera",MODE_PRIVATE).edit().putBoolean("auto_open",enable).apply();
                             if (enable && !android.provider.Settings.canDrawOverlays(this)) {
