@@ -48,7 +48,7 @@ class Emisor : Form {
   cloud=new CloudClient(Folder); pendingFile=Path.Combine(Folder,"emision-pendiente.dat");lastFile=Path.Combine(Folder,"ultimo-comprobante.dat");
   try{pending=PrivateFile.Load<Emission>(pendingFile);last=PrivateFile.Load<Emission>(lastFile);}catch(Exception ex){throw new Exception("No se pudo recuperar el comprobante guardado. No emitas otra vez sin revisar el sistema. "+ex.Message);}
   using(var s=typeof(Emisor).Assembly.GetManifestResourceStream("recibo.ico")) receiptIcon=new Icon(s);
-  Icon=receiptIcon; Text="GRAFIPLOT • Emisor A6"; ClientSize=new Size(360,479); AutoScaleMode=AutoScaleMode.Font;
+  Icon=receiptIcon; Text="GRAFIPLOT • Emisor A6"; ClientSize=new Size(360,479); AutoScaleMode=AutoScaleMode.None;
   Font=new Font("Segoe UI",10); FormBorderStyle=FormBorderStyle.FixedSingle; MaximizeBox=false; MinimizeBox=false;
   ShowInTaskbar=false; StartPosition=FormStartPosition.Manual; BackColor=Color.White;
   var head=new Label {Text="GRAFIPLOT • Emisor A6",Location=new Point(0,0),Size=new Size(360,42),BackColor=Color.FromArgb(192,0,27),ForeColor=Color.White,Font=new Font("Segoe UI",13,FontStyle.Bold),TextAlign=ContentAlignment.MiddleCenter}; Controls.Add(head);
@@ -56,7 +56,7 @@ class Emisor : Form {
   name=new TextBox {Location=new Point(18,80),Size=new Size(324,32),Font=new Font("Segoe UI",14),MaxLength=80}; Controls.Add(name);
   capturePreview=new PictureBox {Location=new Point(18,80),Size=new Size(324,70),SizeMode=PictureBoxSizeMode.StretchImage,BorderStyle=BorderStyle.FixedSingle,BackColor=Color.White,Visible=false,TabStop=true}; Controls.Add(capturePreview);
   var paste=MakeButton("Pegar captura",18,158,158,29); paste.Click+=(s,e)=>PasteCapture(); Controls.Add(paste);
-  var write=MakeButton("Escribir texto",184,158,158,29); write.Click+=(s,e)=>{if(!busy && pending==null){ClearCapture();name.Focus();}}; Controls.Add(write);
+  var write=MakeButton("Escribir texto",184,158,158,29); write.Click+=(s,e)=>{if(!busy && pending==null){ClearCapture();status.Text="Listo • impresión solo en negro";name.Focus();}}; Controls.Add(write);
   AddLabel(this,"Monto en soles (S/)",18,197,320,23);
   amount=new TextBox {Location=new Point(18,224),Size=new Size(324,32),Font=new Font("Segoe UI",16),MaxLength=12}; Controls.Add(amount);
   info=AddLabel(this,"",18,267,324,42); info.Font=new Font("Segoe UI",8);
@@ -290,3 +290,4 @@ static class SelfTest {
   Console.WriteLine("OK: importes, texto, captura monocromática, JSON, 500 QR y recibo QR");
  }
 }
+
