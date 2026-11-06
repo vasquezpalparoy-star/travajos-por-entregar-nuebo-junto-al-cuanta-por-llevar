@@ -1,0 +1,76 @@
+GRAFIPLOT EMISOR A6 CON QR - Version 2.0
+Windows 10/11, .NET Framework 4.5 o posterior (incluido en Windows 10).
+
+ACTUALIZAR
+1. Cierra la version anterior: clic derecho sobre el icono de recibo > Salir.
+2. Extrae todo el ZIP y abre INSTALAR.vbs.
+3. Se conservaran tu impresora y bandeja configuradas.
+
+CONECTAR
+Pulsa Conectar cuenta del sistema y usa el MISMO correo y contrasena con
+el que ingresas a Trabajos por entregar. No es necesariamente el correo
+propietario del panel de Supabase: es tu usuario de la pagina web.
+No necesitas escribir direccion de Supabase, claves ni una IP.
+El programa ya apunta al proyecto que utiliza tu repositorio.
+La contrasena no se guarda. La sesion se protege para tu usuario de Windows.
+
+REGISTRAR E IMPRIMIR
+Escribe nombre o numero y monto. Pulsa REGISTRAR E IMPRIMIR.
+Se registra en pedidos pendientes y se le asigna un QR libre del 001 al 500.
+Primero se confirma el registro; despues se imprime en A6, vertical, una cara,
+solo negro. El QR contiene el mismo codigo que entiende tu escaner actual.
+La web refleja el trabajo al actualizarse (habitualmente en unos segundos).
+El monto se guarda como PRECIO TOTAL, con pago a cuenta 0. No se marca pagado.
+El celular queda vacio, hojas 1 y ubicacion E1. Puedes completar esos datos
+posteriormente en la web. No se inventa un numero de WhatsApp.
+
+CAPTURAS
+Windows + Mayus + S para capturar una region. Luego Pegar captura o Ctrl+V
+fuera del campo del monto. La imagen se ESTIRA para llenar el cuadro,
+aunque se deforme. Escribir texto vuelve al modo de teclado.
+En modo captura el sistema usa el nombre Cliente (captura) y conserva la
+imagen en el trabajo, visible en la web. Puedes editar despues ese nombre.
+La imagen se envia sin color; el QR se genera por separado, sin deformarse.
+
+IMPRESORA
+Configuracion > HP OfficeJet Pro 9020 > bandeja compatible con A6.
+En la HP 9020 utiliza la bandeja 2 para A6. Pon papel real 105 x 148 mm,
+confirma el formato y tipo en la impresora e instala su controlador completo
+si A6 o las bandejas no aparecen. Guarda los ajustes antes de emitir.
+
+FALLOS Y REIMPRESION
+Necesita Internet para registrar o verificar el trabajo.
+Si falla el envio se conserva una emision protegida en este equipo.
+El boton Reintentar registro conserva el mismo identificador y QR.
+No borres sus archivos ni registres manualmente otra copia por el fallo.
+Cuando ya hay QR, el boton IMPRIMIR QR verifica y usa el registro existente.
+Clic derecho sobre el icono > Reimprimir ultimo comprobante para otra copia.
+Antes de repetir, revisa la cola de Windows para evitar duplicados en papel.
+Enviado a la cola no significa que el papel ya salio fisicamente.
+No se reimprimen comprobantes entregados, borrados o modificados en la web.
+Si los 500 QR estan ocupados, entrega o libera un trabajo en tu sistema.
+
+VENTANA E ICONO
+Clic en el icono de recibo con S/: abrir u ocultar. La X tambien oculta.
+Clic derecho > Salir cierra. Windows decide si queda dentro de iconos ocultos.
+
+DATOS LOCALES
+%LOCALAPPDATA%\GrafiplotEmisorA6
+configuracion.xml: impresora/bandeja. Los archivos .dat se cifran para el
+usuario de Windows y permiten recuperar la sesion/emision y la ultima copia.
+No copies archivos de sesion a otro equipo. Inicia sesion alli nuevamente.
+
+DESINSTALAR
+Salir desde el icono. Elimina los accesos directos de Escritorio e Inicio
+y la carpeta %LOCALAPPDATA%\GrafiplotEmisorA6 (incluye la recuperacion local).
+
+CODIGO FUENTE Y CAMBIOS DEL SISTEMA
+https://github.com/vasquezpalparoy-star/travajos-por-entregar-nuebo-junto-al-cuanta-por-llevar/tree/main/windows-emisor-a6
+La funcion de registro se instala en el proyecto Supabase existente.
+No contiene claves secretas administrativas.
+
+VALIDACION
+Registro, RLS, reintentos, capturas, QR unicos y limite de 500 comprobados
+en transacciones revertidas. Los 500 QR se compararon con otra implementacion;
+se verifico la lectura del QR de un recibo renderizado.
+La impresion fisica debe probarse en tu HP 9020.

@@ -386,7 +386,7 @@
         let html5QrcodeScanner = null;
         let isScannerRunning = false;
         let editingRecordId = null;
-        const TOTAL_CODES = 100;
+        const TOTAL_CODES = 500;
 
         const gate = document.getElementById('cloud-gate');
         const cloudMessage = document.getElementById('cloud-message');
@@ -465,6 +465,41 @@
         const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch =>
             ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
+        function receiptCapture(items) {
+            const source = (Array.isArray(items) ? items : []).find(item => item && item.emisor_a6 === true && typeof item.captura === 'string')?.captura || '';
+            return source.length <= 600000 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(source) ? source : '';
+        }
+
+        async function createEmisorReceipt(doc, record, action) {
+            doc.setTextColor(0); doc.setDrawColor(0); doc.setFillColor(255);
+            doc.setFont('helvetica','bold'); doc.setFontSize(21);
+            doc.text('GRAFIPLOT',52.5,17,{align:'center'});
+            doc.setFontSize(12); doc.text('COMPROBANTE',52.5,26,{align:'center'});
+            doc.line(8,32,97,32);
+            doc.setFontSize(11); doc.text('CÓDIGO: '+record.codigo,52.5,40,{align:'center'});
+            doc.setFont('helvetica','normal');doc.setFontSize(8);
+            doc.text(new Date(record.createdAt).toLocaleString('es-PE'),52.5,48,{align:'center'});
+            doc.text('Nombre / Número',52.5,55,{align:'center'});
+            const capture = receiptCapture(record.items);
+            if (capture) doc.addImage(capture,'PNG',8,59,89,15);
+            else {
+                doc.setFont('helvetica','bold');
+                let font = 15, lines;
+                do {doc.setFontSize(font);lines=doc.splitTextToSize(record.nombre,87);if(lines.length<=3)break;font--;} while(font>7);
+                doc.text(lines,52.5,63,{align:'center',lineHeightFactor:1});
+            }
+            doc.line(8,77,97,77); doc.setFontSize(11);doc.setFont('helvetica','bold');
+            doc.text('MONTO',52.5,85,{align:'center'});
+            const money='S/ '+Number(record.precio).toFixed(2);doc.setFontSize(28);
+            while(doc.getTextWidth(money)>87)doc.setFontSize(doc.getFontSize()-1);
+            doc.text(money,52.5,97,{align:'center'});
+            const canvas=document.createElement('canvas');await generatePureQRCode(canvas,record.codigo);
+            doc.addImage(canvas.toDataURL('image/png'),'PNG',37.5,101,30,30);
+            doc.setFontSize(10);doc.text('CÓDIGO: '+record.codigo,52.5,137,{align:'center'});
+            doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text('Gracias por su preferencia',52.5,144,{align:'center'});
+            savePdf(doc,'Recibo_Grafiplot_'+String(record.codigo).replace(/[^0-9]/g,'')+'.pdf',action);
+        }
+
         function toRecord(row) {
             return {
                 id: row.id, nombre: row.nombre || '', celular: row.telefono || '',
@@ -472,7 +507,7 @@
                 descripcion: row.descripcion || (row.items || []).map(i => i.name).join(', '),
                 hojas: Number(row.hojas) || 1, precio: Number(row.total) || 0,
                 pago: Number(row.pago) || 0, createdAt: row.guardado_en,
-                items: row.items || [], estado: row.estado
+                items: row.items || [], captura: receiptCapture(row.items), estado: row.estado
             };
         }
 
@@ -958,7 +993,7 @@
                 const startY = 10;
                 const qrSize = 22;
 
-                for (let i = 1; i <= 100; i++) {
+                for (let i = 1; i <= TOTAL_CODES; i++) {
                     const code = String(i).padStart(3, '0');
                     await generatePureQRCode(canvas, code);
                     const imgData = canvas.toDataURL("image/jpeg", 0.95);
@@ -1013,6 +1048,9 @@
             try {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
+                if ((record.items || []).some(item => item && item.emisor_a6 === true)) {
+                    await createEmisorReceipt(doc, record, action); return;
+                }
                 
                 doc.setFillColor(227, 24, 55); 
                 doc.rect(0, 0, 105, 18, 'F');
@@ -1232,6 +1270,7 @@
                         <div>
                             <div class="text-[10px] font-bold text-gray-500 uppercase">Cliente</div>
                             <div class="font-bold text-gray-900 text-sm">${escapeHtml(record.nombre)}</div>
+                            ${record.captura ? `<img src="${record.captura}" alt="Captura del cliente" class="mt-1 border rounded" style="width:100%;height:60px;object-fit:fill">` : ''}
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <div>
@@ -1353,6 +1392,7 @@
                             </span>
                             <div>
                                 <h4 class="font-bold text-gray-900 text-xs leading-snug">${escapeHtml(r.nombre)}</h4>
+                                ${r.captura ? `<img src="${r.captura}" alt="Captura del cliente" class="mt-1 border rounded" style="width:240px;height:52px;object-fit:fill">` : ''}
                                 <div class="text-[11px] text-gray-500 flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                                     <span>📱 ${escapeHtml(r.celular)}</span>
                                     <span>📄 ${r.hojas} h.</span>
@@ -1607,3 +1647,4 @@
     </script>
 </body>
 </html>
+

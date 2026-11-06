@@ -1,0 +1,42 @@
+name: Compilar Emisor A6 Windows
+on:
+  push:
+    paths:
+      - 'windows-emisor-a6/**'
+      - '.github/workflows/build-emisor-a6.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compilar y probar en Windows
+        shell: powershell
+        run: |
+          Set-Location windows-emisor-a6
+          $compiler = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          & $compiler /nologo /target:winexe /platform:anycpu /optimize+ /out:GRAFIPLOT_Emisor_A6.exe /win32icon:recibo.ico /resource:recibo.ico,recibo.ico /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll /reference:System.Security.dll Emisor.cs Cloud.cs ReceiptQr.cs
+          if ($LASTEXITCODE -ne 0) { throw 'Fallo la compilacion' }
+          $test = Start-Process -FilePath '.\GRAFIPLOT_Emisor_A6.exe' -ArgumentList '--self-test' -Wait -PassThru
+          if ($test.ExitCode -ne 0) { throw 'Fallaron las pruebas de recibos, QR o recuperacion' }
+          $ui = Start-Process -FilePath '.\GRAFIPLOT_Emisor_A6.exe' -ArgumentList '--ui-smoke-test' -Wait -PassThru
+          if ($ui.ExitCode -ne 0) { throw 'Fallo la prueba de interfaz y portapapeles' }
+          Compress-Archive -Path GRAFIPLOT_Emisor_A6.exe,GRAFIPLOT_Emisor_A6.exe.config,INSTALAR.vbs,recibo.ico,LEEME.txt -DestinationPath GRAFIPLOT_Emisor_A6_Windows.zip
+      - name: Verificar QR con implementacion independiente
+        shell: powershell
+        run: |
+          Set-Location windows-emisor-a6
+          python -m pip install -r requirements-qr-test.txt
+          python test_qr.py
+          if ($LASTEXITCODE -ne 0) { throw 'Los QR no superaron la verificacion independiente' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GRAFIPLOT-Emisor-A6-Windows
+          path: |
+            windows-emisor-a6/GRAFIPLOT_Emisor_A6_Windows.zip
+            windows-emisor-a6/*prueba.png
+            windows-emisor-a6/comprobante-qr.png
+            windows-emisor-a6/qr-matrices.txt

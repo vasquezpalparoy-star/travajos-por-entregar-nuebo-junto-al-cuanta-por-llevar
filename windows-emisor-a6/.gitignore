@@ -1,0 +1,7 @@
+*.exe
+*.zip
+*.png
+qr-matrices.txt
+*.dat
+*.dat.bak
+configuracion.xml*
