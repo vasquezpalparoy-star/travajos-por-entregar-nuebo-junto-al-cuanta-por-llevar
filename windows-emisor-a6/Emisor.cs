@@ -161,12 +161,14 @@ class Emisor : Form {
  void SetPendingMode(){name.ReadOnly=pending!=null;amount.ReadOnly=pending!=null;emit.Text=pending==null?"REGISTRAR E IMPRIMIR":(string.IsNullOrEmpty(pending.Code)?"REINTENTAR REGISTRO":"IMPRIMIR QR "+pending.Code);if(pending!=null)status.Text="Emisión recuperable • "+(pending.Code==""?"falta confirmar registro":"QR "+pending.Code+" guardado");}
  Task<bool> Connect() {
   if(busy)return Task.FromResult(false);
-  using(var f=new Form{Text="Conectar con tu sistema",ClientSize=new Size(385,266),StartPosition=FormStartPosition.CenterParent,FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false,Font=Font,Icon=receiptIcon}) {
+  using(var f=new Form{Text="Conectar con tu sistema",ClientSize=new Size(385,306),StartPosition=FormStartPosition.CenterParent,FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false,Font=Font,Icon=receiptIcon}) {
    AddLabel(f,"Usa el mismo correo de Trabajos por entregar.",15,12,355,35);
    AddLabel(f,"Correo",15,50,355,22);var email=new TextBox{Location=new Point(15,73),Width=355,Text=cloud.Session==null?"":cloud.Session.Email};f.Controls.Add(email);
    AddLabel(f,"Contraseña",15,110,355,22);var pass=new TextBox{Location=new Point(15,133),Width=355,UseSystemPasswordChar=true};f.Controls.Add(pass);
    var message=AddLabel(f,"La contraseña no se guarda.",15,170,355,38);message.Font=new Font("Segoe UI",8);
-   var button=MakeButton("Conectar",15,219,172,33);var cancel=MakeButton("Cancelar",198,219,172,33);f.Controls.Add(button);f.Controls.Add(cancel);cancel.DialogResult=DialogResult.Cancel;f.CancelButton=cancel;f.AcceptButton=button;
+   var forgot=MakeButton("Recuperar contraseña",15,211,355,32);f.Controls.Add(forgot);
+   forgot.Click+=(a,b)=>{try{System.Diagnostics.Process.Start("https://vasquezpalparoy-star.github.io/travajos-por-entregar-nuebo-junto-al-cuanta-por-llevar/?recuperar=1");}catch(Exception ex){message.Text="Abre la página web del sistema para recuperar tu contraseña. "+ex.Message;}};
+   var button=MakeButton("Conectar",15,259,172,33);var cancel=MakeButton("Cancelar",198,259,172,33);f.Controls.Add(button);f.Controls.Add(cancel);cancel.DialogResult=DialogResult.Cancel;f.CancelButton=cancel;f.AcceptButton=button;
    bool connecting=false;f.FormClosing+=(a,b)=>{if(connecting)b.Cancel=true;};
    button.Click+=async(a,b)=>{
     if(email.Text.Trim()==""||pass.Text==""){message.Text="Escribe tu correo y contraseña del sistema.";return;}

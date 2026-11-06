@@ -318,6 +318,7 @@
                 <p id="cloud-message" class="text-sm text-red-600" role="alert"></p>
                 <button id="cloud-submit" type="submit" class="w-full bg-red-600 text-white font-bold p-3 rounded-xl">Entrar y sincronizar</button>
                 <button id="cloud-forgot" type="button" class="w-full text-blue-700 p-2">Olvidé mi contraseña</button>
+                <button id="cloud-back-login" type="button" class="hidden w-full text-slate-600 p-2" onclick="location.href=location.pathname">Volver al inicio de sesión</button>
                 <button id="cloud-mode" type="button" class="w-full text-blue-700 font-bold p-2">Crear una cuenta nueva</button>
             </form>
         </div>
@@ -325,6 +326,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script type="module">
         let recoveringPassword = new URLSearchParams(location.hash.slice(1)).get('type') === 'recovery';
+        let requestingRecovery = new URLSearchParams(location.search).get('recuperar') === '1' && !recoveringPassword;
         const androidScannerMode = navigator.userAgent.includes('GrafiplotAndroid/');
         let backgroundActive = false;
         let torchActive = false;
@@ -365,7 +367,7 @@
         function reconcileScanner() {
             if (!androidScannerMode) return;
             scannerQueue = scannerQueue.catch(() => {}).then(async () => {
-                const shouldRun = !backgroundActive && appForeground && scannerWanted && !!owner && !recoveringPassword;
+                const shouldRun = !backgroundActive && appForeground && scannerWanted && !!owner && !recoveringPassword && !requestingRecovery;
                 if (shouldRun && !isScannerRunning && !scannerStarting) {
                     await window.startScannerInstance();
                 } else if (!shouldRun && isScannerRunning && html5QrcodeScanner) {
@@ -550,11 +552,12 @@
                 if (error) throw error;
                 owner = session?.user || null;
                 if (recoveringPassword) showRecoveryForm();
+                else if (requestingRecovery) showRecoveryRequest();
                 else if (owner) { gate.classList.add('hidden'); await refreshRecords(); }
                 else gate.classList.remove('hidden');
                 api.auth.onAuthStateChange((_event, sessionNow) => {
                     owner = sessionNow?.user || null;
-                    gate.classList.toggle('hidden', !!owner && !recoveringPassword);
+                    gate.classList.toggle('hidden', !!owner && !recoveringPassword && !requestingRecovery);
                     if (owner) refreshRecords(); else { records = []; handleSearch(); if (backgroundActive && window.GrafiplotScanner?.postMessage) window.GrafiplotScanner.postMessage(JSON.stringify({action:'stop'})); reconcileScanner(); }
                 });
                 setInterval(refreshRecords, 6000);
@@ -566,7 +569,26 @@
             }
         }
 
+        function showRecoveryRequest() {
+            gate.classList.remove('hidden');
+            document.querySelector('#cloud-gate h2').textContent = 'Recuperar contraseña';
+            document.querySelector('#cloud-gate h2 + p').textContent = 'Escribe el correo de tu cuenta para recibir el enlace de recuperación.';
+            const email = document.getElementById('cloud-email');
+            email.classList.remove('hidden'); email.required = true;
+            if (!email.value && owner?.email) email.value = owner.email;
+            cloudPassword.required = false; cloudPassword.classList.add('hidden');
+            cloudConfirm.required = false; cloudConfirm.classList.add('hidden');
+            cloudSubmit.classList.add('hidden'); cloudMode.classList.add('hidden');
+            const forgot = document.getElementById('cloud-forgot');
+            forgot.textContent = 'Enviar enlace de recuperación';
+            forgot.className = 'w-full bg-red-600 text-white font-bold p-3 rounded-xl';
+            document.getElementById('cloud-back-login').classList.remove('hidden');
+        }
+
         function showRecoveryForm() {
+            requestingRecovery = false;
+            cloudPassword.classList.remove('hidden'); cloudPassword.required = true;
+            cloudSubmit.classList.remove('hidden');
             gate.classList.remove('hidden');
             document.querySelector('#cloud-gate h2').textContent = 'Nueva contraseña';
             document.getElementById('cloud-email').required = false;
@@ -619,6 +641,7 @@
 
         document.getElementById('cloud-form').addEventListener('submit', async (event) => {
             event.preventDefault();
+            if (requestingRecovery) { document.getElementById('cloud-forgot').click(); return; }
             cloudMessage.textContent = '';
             const url = CLOUD_URL;
             const key = CLOUD_KEY;
@@ -1607,6 +1630,7 @@
                     document.getElementById('camera-torch').textContent = torchActive ? 'Apagar flash' : 'Encender flash';
                 } catch (error) { showToast(error.message || 'No se pudo activar el flash.', 'error'); }
             });
+            if (requestingRecovery) showRecoveryRequest();
             initApp();
             
             const inpPrecio = document.getElementById('reg-precio');
