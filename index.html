@@ -226,7 +226,7 @@
                         📊 Exportar Excel
                     </button>
                     <button onclick="generateBarcodesPDF()" class="w-full bg-amber-100 hover:bg-amber-200 active:bg-amber-300 text-amber-900 font-bold py-2 rounded-xl transition-colors flex justify-center items-center gap-1.5 border border-amber-300 text-xs shadow-sm">
-                        📄 100 QR PDF
+                        📄 500 QR PDF
                     </button>
                     <button onclick="showClearModal()" class="w-full bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-800 font-bold py-2 rounded-xl transition-colors flex justify-center items-center gap-1.5 border border-red-300 text-xs shadow-sm">
                         🗑️ Limpiar Todo
@@ -701,7 +701,7 @@
             if (availableCount === 0) {
                 const opt = document.createElement('option');
                 opt.value = "";
-                opt.textContent = "No hay códigos libres (1-100)";
+                opt.textContent = "No hay códigos libres (001-500)";
                 opt.disabled = true;
                 selectEl.appendChild(opt);
                 selectEl.classList.add('bg-red-50', 'text-red-600');
@@ -968,7 +968,7 @@
 
             try {
                 if (btn) btn.disabled = true;
-                showToast("Generando PDF con 100 QR... Por favor espera", "success");
+                showToast("Generando PDF con 500 QR... Por favor espera", "success");
 
                 if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
                     throw new Error("Librería jsPDF no está cargada.");
@@ -1022,7 +1022,7 @@
                     doc.rect(x, y, cellWidth, cellHeight);
 
                     if (i % 15 === 0) {
-                        if (btn) btn.innerHTML = `⏳ (${i}/100)`;
+                        if (btn) btn.innerHTML = `⏳ (${i}/${TOTAL_CODES})`;
                         await new Promise(r => setTimeout(r, 10));
                     }
                 }
