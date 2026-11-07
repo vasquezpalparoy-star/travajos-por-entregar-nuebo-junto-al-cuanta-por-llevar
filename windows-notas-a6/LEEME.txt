@@ -1,0 +1,68 @@
+GRAFIPLOT NOTAS A6 - Version 1.0
+Windows 10/11, 64 o 32 bits. Usa .NET Framework incluido en Windows 10.
+
+INSTALAR
+Extrae TODO el ZIP en una carpeta y abre INSTALAR.vbs.
+Se crea acceso en Escritorio y arranque automatico con Windows.
+No requiere permisos de administrador. Icono amarillo junto al reloj.
+Windows puede colocarlo dentro de la flecha de iconos ocultos.
+Un clic abre u oculta. La X oculta; clic derecho > Salir cierra.
+
+PRECIOS Y FILAS
+Formatos iniciales: A4, A1, A3, A0 y A2, mas Otros.
+Los precios comienzan en 0.00: debes colocar TUS precios antes de cobrar.
+En Cantidad puedes poner 25 + 15 + 10. Enter calcula cantidad por precio
+unitario y pasa a la fila siguiente. Se aceptan decimales con punto o coma
+en precios e importes; las cantidades de copias son enteras.
+Otros: escribe directamente el importe en la ultima columna, en soles.
+Puedes cambiar la descripcion de Otros o agregar filas con + Fila.
+Los precios editados se conservan y se usan en las notas nuevas.
+Las notas que ya tenian precio conservan su propio precio.
+Maximo 50 filas por nota y 200 notas. Filas vacias no se cobran.
+
+NOTAS Y RESPALDO
++ junto a las pestanas crea otra nota. Doble clic en pestana renombra.
+Notas / respaldo permite eliminar fila/nota, respaldar y restaurar.
+Notas, precios y borradores se guardan automaticamente en esta PC.
+El respaldo XML permite llevar notas y precios a otra PC. No contiene la
+sesion del sistema. Importar reemplaza las notas, conservando copia local.
+Los comprobantes ya registrados permanecen en el sistema web.
+
+CONECTAR AL SISTEMA
+Pulsa Conectar cuenta y usa el MISMO correo y contrasena con que entras a
+Trabajos por entregar / trabajos por recoger. No solicita IP ni claves.
+La contrasena no se guarda; la sesion se protege para tu usuario de Windows.
+La impresora y bandeja se copian del Emisor A6 anterior, si estan guardadas.
+Notas A6 es una aplicacion adicional: no borra ni reemplaza el emisor anterior.
+
+GUARDAR E IMPRIMIR
+Escribe cliente, cantidades, precios y nota. Pulsa GUARDAR E IMPRIMIR.
+Primero guarda en pedidos pendientes del MISMO sistema y asigna QR 001-500.
+Guarda el detalle por formato, precios, cantidades, nota y total. El pago a
+cuenta queda en 0 y el saldo es el total: no marca pagado el trabajo.
+Telefono vacio y ubicacion E1; puedes editarlos en la web.
+Despues envia el comprobante A6 vertical, una cara, blanco y negro a la cola.
+No tiene vista previa en pantalla. Recibos de mas de 8 filas usan varias
+paginas A6 con el mismo QR, total y numero de pagina.
+
+IMPRESORA
+Pulsa Impresora para elegir impresora y bandeja, y cantidad de copias.
+En HP OfficeJet Pro 9020 usa bandeja compatible con A6, normalmente la 2.
+Carga A6 real (105 x 148 mm) y confirma formato en el controlador.
+Que Windows acepte la impresion no garantiza que el papel haya salido.
+La impresion fisica debe comprobarse en tu impresora.
+
+REINTENTOS
+Si falla Internet o imprimir, se conserva la misma emision y QR.
+Las filas quedan bloqueadas hasta completar esa emision.
+Revisa la cola de Windows antes de repetir para evitar copias en papel.
+Clic derecho en icono > Reimprimir ultimo comprobante para otra copia.
+No reimprime trabajos entregados, borrados o modificados en el sistema.
+Si todos los QR estan ocupados, libera o entrega trabajos desde la web.
+
+DATOS
+%LOCALAPPDATA%\GrafiplotNotasA6
+Se conservan tras reiniciar Windows. Los archivos .dat estan protegidos para
+el usuario actual de Windows; utiliza el respaldo XML para otra PC.
+Para detener inicio automatico: Windows + R > shell:startup y elimina
+el acceso GRAFIPLOT Notas A6. Esto no elimina tus notas.

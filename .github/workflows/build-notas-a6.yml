@@ -1,0 +1,42 @@
+name: Compilar Notas A6 Windows
+on:
+  push:
+    paths:
+      - 'windows-notas-a6/**'
+      - '.github/workflows/build-notas-a6.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compilar y verificar Windows
+        shell: powershell
+        run: |
+          Set-Location windows-notas-a6
+          $compiler = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          & $compiler /nologo /target:winexe /platform:anycpu /optimize+ /out:GRAFIPLOT_Notas_A6.exe /win32icon:notas.ico /resource:notas.ico,notas.ico /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll /reference:System.Security.dll Notas.cs Models.cs Cloud.cs ReceiptQr.cs
+          if ($LASTEXITCODE -ne 0) { throw 'Fallo la compilacion' }
+          foreach ($mode in @('--self-test','--ui-smoke-test','--startup-smoke-test')) {
+            $process = Start-Process -FilePath '.\GRAFIPLOT_Notas_A6.exe' -ArgumentList $mode -PassThru
+            if (!$process.WaitForExit(60000)) { $process.Kill(); throw "Tiempo de prueba agotado: $mode" }
+            if ($process.ExitCode -ne 0) { Get-Content error-*.txt -ErrorAction SilentlyContinue; throw "Fallo: $mode" }
+          }
+          python -m pip install -r ../windows-emisor-a6/requirements-qr-test.txt
+          Copy-Item comprobante-prueba.png comprobante-qr.png
+          python ../windows-emisor-a6/test_qr.py
+          if ($LASTEXITCODE -ne 0) { throw 'Fallo verificacion QR independiente' }
+          Compress-Archive -Path GRAFIPLOT_Notas_A6.exe,GRAFIPLOT_Notas_A6.exe.config,INSTALAR.vbs,notas.ico,LEEME.txt -DestinationPath GRAFIPLOT_Notas_A6_Windows.zip
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: GRAFIPLOT-Notas-A6-Windows
+          path: |
+            windows-notas-a6/GRAFIPLOT_Notas_A6_Windows.zip
+            windows-notas-a6/*prueba.png
+            windows-notas-a6/comprobante-largo-*.png
+            windows-notas-a6/error-*.txt
+            windows-notas-a6/pruebas-ok.txt
