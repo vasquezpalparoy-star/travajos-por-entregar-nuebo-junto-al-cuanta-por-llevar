@@ -72,7 +72,7 @@ class CloudClient {
  }
  public void Register(Emission emission) {
   EnsureSession();if(emission.UserId!=Session.UserId)throw new Exception("Esta emisión pertenece a otra cuenta. Conecta el correo con el que la iniciaste.");
-  var response=(Dictionary<string,object>)Request("POST","/rest/v1/rpc/grafiplot_notas_emitir_a6",new{p_id=emission.Id,p_nombre=emission.Name,p_total=emission.Total,p_items=Payload(emission),p_nota=emission.Note},Session.Access);
+  var response=(Dictionary<string,object>)Request("POST","/rest/v1/rpc/grafiplot_notas_emitir_a6_v2",new{p_id=emission.Id,p_nombre=emission.Name,p_total=emission.Total,p_items=Payload(emission),p_nota=emission.Note},Session.Access);
   Validate(response,emission);ValidateDetails(response,emission);
   if(emission.Total!=Convert.ToDecimal(response["total"],System.Globalization.CultureInfo.InvariantCulture)||emission.Name!=StringValue(response,"nombre"))throw new Exception("Este trabajo fue modificado en la web. Revisa su comprobante en el sistema antes de imprimir.");
   emission.Code=StringValue(response,"codigo");emission.Date=StringValue(response,"guardado_en");
@@ -90,9 +90,12 @@ class CloudClient {
   object raw;if(!row.TryGetValue("items",out raw))throw new Exception("Falta el detalle del registro.");
   var items=raw as object[];if(items==null||items.Length!=e.Lines.Count)throw new Exception("El detalle cambió en la web.");
   for(int i=0;i<items.Length;i++){var item=items[i] as Dictionary<string,object>;var l=e.Lines[i];if(item==null||StringValue(item,"name")!=l.Name||StringValue(item,"mode")!=l.Mode||Convert.ToDecimal(item["price"],System.Globalization.CultureInfo.InvariantCulture)!=l.Price)throw new Exception("El detalle cambió en la web.");var qs=item["quantities"] as object[];if(qs==null||qs.Length!=l.Quantities.Length)throw new Exception("Las cantidades cambiaron en la web.");for(int j=0;j<qs.Length;j++)if(Convert.ToString(qs[j],System.Globalization.CultureInfo.InvariantCulture)!=l.Quantities[j])throw new Exception("Las cantidades cambiaron en la web.");}
-  var names=new List<string>();foreach(var l in e.Lines)names.Add(l.Name);string description=String.Join(", ",names.ToArray());if(e.Note!="")description=e.Note+" | "+description;
-  if(StringValue(row,"descripcion")!=description)throw new Exception("La nota cambió en la web. Revisa el comprobante en el sistema.");
+  string description=Summary(e),legacy=LegacyDescription(e);
+  if(StringValue(row,"descripcion")!=description&&StringValue(row,"descripcion")!=legacy)throw new Exception("La nota o las cantidades cambiaron en la web. Revisa el comprobante en el sistema.");
+
  }
+ internal static string LegacyDescription(Emission e){var names=new List<string>();foreach(var l in e.Lines)names.Add(l.Name);string s=String.Join(", ",names.ToArray());return e.Note!=""?e.Note+" | "+s:s;}
+ internal static string Summary(Emission e){var keys=new List<string>();var names=new Dictionary<string,string>();var modes=new Dictionary<string,string>();var quantities=new Dictionary<string,decimal>();var amounts=new Dictionary<string,decimal>();foreach(var l in e.Lines){string key=l.Mode+"|"+l.Name;if(!names.ContainsKey(key)){keys.Add(key);names[key]=l.Name;modes[key]=l.Mode;quantities[key]=0;amounts[key]=0;}quantities[key]+=l.Quantity;amounts[key]+=l.Amount;}var parts=new List<string>();foreach(string key in keys)parts.Add(names[key]+(modes[key]=="otros"?": S/ "+Calc.F(amounts[key]):": "+quantities[key].ToString("0",System.Globalization.CultureInfo.InvariantCulture)));return String.Join(" | ",parts.ToArray())+(e.Note!=""?" | Nota: "+e.Note:"");}
  static void Validate(Dictionary<string,object> row,Emission e) {
   if(StringValue(row,"id")!=e.Id||StringValue(row,"user_id")!=e.UserId)throw new Exception("La respuesta no corresponde a esta emisión.");
   if(StringValue(row,"estado")!="pendiente")throw new Exception("El trabajo ya no está pendiente. No se reutilizará su QR.");

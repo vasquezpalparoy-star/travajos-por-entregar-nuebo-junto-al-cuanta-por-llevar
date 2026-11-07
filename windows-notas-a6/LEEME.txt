@@ -47,7 +47,9 @@ Notas A6 es una aplicacion adicional: no borra ni reemplaza el emisor anterior.
 GUARDAR E IMPRIMIR
 Escribe cliente, cantidades, precios y nota. Pulsa GUARDAR E IMPRIMIR.
 Primero guarda en pedidos pendientes del MISMO sistema y asigna QR 001-500.
-Guarda el detalle por formato, precios, cantidades, nota y total. El pago a
+Guarda el detalle por formato, precios, cantidades, nota y total.
+La descripcion del sistema muestra cuantas copias son de cada tamano, por
+ejemplo A4: 50 | A1: 3 | A3: 4. Suma las filas repetidas del mismo formato. El pago a
 cuenta queda en 0 y el saldo es el total: no marca pagado el trabajo.
 Telefono vacio y ubicacion E1; puedes editarlos en la web.
 Despues envia el comprobante A6 vertical, una cara, blanco y negro a la cola.
