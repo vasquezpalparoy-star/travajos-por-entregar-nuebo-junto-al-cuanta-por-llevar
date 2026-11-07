@@ -18,7 +18,7 @@ jobs:
         run: |
           Set-Location windows-notas-a6
           $compiler = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-          & $compiler /nologo /target:winexe /platform:anycpu /optimize+ /out:GRAFIPLOT_Notas_A6.exe /win32icon:notas.ico /resource:notas.ico,notas.ico /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll /reference:System.Security.dll Notas.cs Models.cs Cloud.cs ReceiptQr.cs
+          & $compiler /nologo /target:winexe /platform:anycpu /optimize+ /out:GRAFIPLOT_Notas_A6.exe /win32icon:notas.ico /resource:notas.ico,notas.ico /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll /reference:System.Security.dll Notas.cs Models.cs Cloud.cs ReceiptQr.cs Style.cs
           if ($LASTEXITCODE -ne 0) { throw 'Fallo la compilacion' }
           foreach ($mode in @('--self-test','--ui-smoke-test','--startup-smoke-test')) {
             $process = Start-Process -FilePath '.\GRAFIPLOT_Notas_A6.exe' -ArgumentList $mode -PassThru

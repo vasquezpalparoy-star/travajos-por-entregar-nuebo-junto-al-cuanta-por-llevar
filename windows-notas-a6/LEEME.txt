@@ -1,5 +1,10 @@
-GRAFIPLOT NOTAS A6 - Version 1.0
+GRAFIPLOT NOTAS A6 - Version 1.1 - Estilo moderno
 Windows 10/11, 64 o 32 bits. Usa .NET Framework incluido en Windows 10.
+
+ACTUALIZAR
+Cierra la version anterior desde clic derecho en su icono > Salir.
+Instala esta version en el mismo usuario de Windows: conserva notas, precios,
+sesion e impresora. No elimines la carpeta de datos.
 
 INSTALAR
 Extrae TODO el ZIP en una carpeta y abre INSTALAR.vbs.
