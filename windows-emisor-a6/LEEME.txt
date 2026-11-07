@@ -1,4 +1,4 @@
-GRAFIPLOT EMISOR A6 CON QR - Version 2.0
+GRAFIPLOT EMISOR A6 CON QR - Version 2.1
 Windows 10/11, .NET Framework 4.5 o posterior (incluido en Windows 10).
 
 ACTUALIZAR
@@ -13,6 +13,20 @@ propietario del panel de Supabase: es tu usuario de la pagina web.
 No necesitas escribir direccion de Supabase, claves ni una IP.
 El programa ya apunta al proyecto que utiliza tu repositorio.
 La contrasena no se guarda. La sesion se protege para tu usuario de Windows.
+
+INICIO AUTOMATICO Y DATOS
+Al instalar se crea un acceso en Inicio de Windows para tu usuario.
+Al encender o reiniciar la PC y entrar a Windows, el emisor quedara en
+el icono de recibo junto al reloj, con la ventana oculta.
+Clic en el icono para abrir y continuar con los datos que dejaste.
+Nombre, captura y monto sin emitir se guardan automaticamente en este
+equipo. Tambien se conservan sesion, impresora, bandeja y emision pendiente.
+Al emitir correctamente se limpian los campos y el borrador, para no
+volver a emitir el mismo trabajo al reiniciar.
+Limpiar o Escribir texto tambien actualizan el borrador guardado.
+Si Windows muestra un error de almacenamiento, revisa el aviso del emisor.
+Para impedir el inicio automatico, presiona Windows + R, escribe
+shell:startup y elimina el acceso GRAFIPLOT Emisor A6 de esa carpeta.
 
 REGISTRAR E IMPRIMIR
 Escribe nombre o numero y monto. Pulsa REGISTRAR E IMPRIMIR.
@@ -62,7 +76,7 @@ No copies archivos de sesion a otro equipo. Inicia sesion alli nuevamente.
 
 DESINSTALAR
 Salir desde el icono. Elimina los accesos directos de Escritorio e Inicio
-y la carpeta %LOCALAPPDATA%\GrafiplotEmisorA6 (incluye la recuperacion local).
+el acceso de shell:startup y la carpeta %LOCALAPPDATA%\GrafiplotEmisorA6 (incluye la recuperacion local).
 
 CODIGO FUENTE Y CAMBIOS DEL SISTEMA
 https://github.com/vasquezpalparoy-star/travajos-por-entregar-nuebo-junto-al-cuanta-por-llevar/tree/main/windows-emisor-a6

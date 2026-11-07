@@ -1,5 +1,5 @@
 Option Explicit
-Dim sh, fs, source, dest, link, desktop, menu
+Dim sh, fs, source, dest, link, desktop, menu, startup
 Set sh = CreateObject("WScript.Shell")
 Set fs = CreateObject("Scripting.FileSystemObject")
 source = fs.GetParentFolderName(WScript.ScriptFullName)
@@ -26,5 +26,12 @@ link.TargetPath = dest & "\GRAFIPLOT_Emisor_A6.exe"
 link.WorkingDirectory = dest
 link.IconLocation = dest & "\recibo.ico"
 link.Save
-MsgBox "Instalacion terminada. Se creo el acceso directo en el escritorio." & vbCrLf & "Elige tu HP 9020 y la bandeja A6 en Configuracion.", 64, "GRAFIPLOT"
+startup = sh.SpecialFolders("Startup")
+Set link = sh.CreateShortcut(startup & "\GRAFIPLOT Emisor A6.lnk")
+link.TargetPath = dest & "\GRAFIPLOT_Emisor_A6.exe"
+link.Arguments = "--startup"
+link.WorkingDirectory = dest
+link.IconLocation = dest & "\recibo.ico"
+link.Save
+MsgBox "Se iniciara automaticamente con Windows y conservara tus datos." & vbCrLf & "Instalacion terminada. Se creo el acceso directo en el escritorio." & vbCrLf & "Elige tu HP 9020 y la bandeja A6 en Configuracion.", 64, "GRAFIPLOT"
 sh.Run Chr(34) & dest & "\GRAFIPLOT_Emisor_A6.exe" & Chr(34), 1, False

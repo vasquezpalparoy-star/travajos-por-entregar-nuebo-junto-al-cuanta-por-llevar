@@ -24,6 +24,8 @@ jobs:
           if ($test.ExitCode -ne 0) { throw 'Fallaron las pruebas de recibos, QR o recuperacion' }
           $ui = Start-Process -FilePath '.\GRAFIPLOT_Emisor_A6.exe' -ArgumentList '--ui-smoke-test' -Wait -PassThru
           if ($ui.ExitCode -ne 0) { throw 'Fallo la prueba de interfaz y portapapeles' }
+          $startup = Start-Process -FilePath '.\GRAFIPLOT_Emisor_A6.exe' -ArgumentList '--startup-smoke-test' -Wait -PassThru
+          if ($startup.ExitCode -ne 0) { throw 'Fallo la recuperacion de datos o el inicio oculto tras reiniciar' }
           Compress-Archive -Path GRAFIPLOT_Emisor_A6.exe,GRAFIPLOT_Emisor_A6.exe.config,INSTALAR.vbs,recibo.ico,LEEME.txt -DestinationPath GRAFIPLOT_Emisor_A6_Windows.zip
       - name: Verificar QR con implementacion independiente
         shell: powershell

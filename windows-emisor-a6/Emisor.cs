@@ -13,16 +13,17 @@ public class Options {
  public string Printer=""; public int Tray=-1; public string TrayName="";
  public int Copies=1; public long Next=1;
 }
+public class WindowDraft { public string Name="",Amount="",Capture=""; }
 static class Program {
- public static bool Smoke=false;
+ public static bool Smoke=false,StartHidden=false,StartupSmoke=false;
  [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
  [STAThread] static void Main(string[] args) {
   if(args.Length>0 && args[0]=="--self-test") { SelfTest.Run(); return; }
-  Smoke=args.Length>0 && args[0]=="--ui-smoke-test";
+  Smoke=Array.IndexOf(args,"--ui-smoke-test")>=0; StartupSmoke=Array.IndexOf(args,"--startup-smoke-test")>=0; StartHidden=StartupSmoke||Array.IndexOf(args,"--startup")>=0;
   bool first; using(var mutex=new Mutex(true,"Local\\GrafiplotEmisorA6_1",out first)) {
    if(!first) { MessageBox.Show("El emisor ya está abierto. Busca el icono de recibo junto al reloj.","GRAFIPLOT"); return; }
    try { SetProcessDPIAware(); Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false); Application.Run(new Emisor()); }
-   catch(Exception ex) { if(Smoke){Console.Error.WriteLine(ex);Environment.ExitCode=1;}else MessageBox.Show(ex.Message,"No se pudo iniciar GRAFIPLOT",MessageBoxButtons.OK,MessageBoxIcon.Error); }
+   catch(Exception ex) { if(Smoke||StartupSmoke){Console.Error.WriteLine(ex);Environment.ExitCode=1;}else MessageBox.Show(ex.Message,"No se pudo iniciar GRAFIPLOT",MessageBoxButtons.OK,MessageBoxIcon.Error); }
   }
  }
 }
@@ -37,14 +38,15 @@ static class Money {
  public static string Text(decimal value) { return "S/ "+value.ToString("0.00",CultureInfo.InvariantCulture); }
 }
 class Emisor : Form {
- static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"GrafiplotEmisorA6");
+ static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),(Program.Smoke||Program.StartupSmoke)?"GrafiplotEmisorA6-Pruebas":"GrafiplotEmisorA6");
  readonly string settings=Path.Combine(Folder,"configuracion.xml");
  Options opt; NotifyIcon tray; TextBox name,amount; Label info,status; Button emit; bool exit=false,busy=false;
  Icon receiptIcon; PictureBox capturePreview; Bitmap capture;
  CloudClient cloud; Emission pending; string pendingFile,lastFile; Button account;
- Emission last;
+ Emission last; string draftFile,captureData=""; bool restoringDraft=true,firstVisibility=true;
  public Emisor() {
   Directory.CreateDirectory(Folder); opt=LoadSettings();
+  draftFile=Path.Combine(Folder,"borrador-ventana.dat");
   cloud=new CloudClient(Folder); pendingFile=Path.Combine(Folder,"emision-pendiente.dat");lastFile=Path.Combine(Folder,"ultimo-comprobante.dat");
   try{pending=PrivateFile.Load<Emission>(pendingFile);last=PrivateFile.Load<Emission>(lastFile);}catch(Exception ex){throw new Exception("No se pudo recuperar el comprobante guardado. No emitas otra vez sin revisar el sistema. "+ex.Message);}
   using(var s=typeof(Emisor).Assembly.GetManifestResourceStream("recibo.ico")) receiptIcon=new Icon(s);
@@ -69,10 +71,46 @@ class Emisor : Form {
   var menu=new ContextMenuStrip(); menu.Items.Add("Mostrar / ocultar",null,(s,e)=>Toggle()); menu.Items.Add("Configuración",null,(s,e)=>{ShowPanel();Configure();}); menu.Items.Add("Reimprimir último comprobante",null,async(s,e)=>{ShowPanel();await Emit(true);}); menu.Items.Add("Abrir Trabajos por entregar",null,(s,e)=>System.Diagnostics.Process.Start("https://vasquezpalparoy-star.github.io/travajos-por-entregar-nuebo-junto-al-cuanta-por-llevar/"));menu.Items.Add(new ToolStripSeparator()); menu.Items.Add("Salir",null,(s,e)=>{exit=true;Close();});
   tray=new NotifyIcon {Icon=receiptIcon,Text="GRAFIPLOT Emisor A6 • clic para abrir / ocultar",Visible=true,ContextMenuStrip=menu};
   tray.MouseClick+=(s,e)=>{if(e.Button==MouseButtons.Left)Toggle();};
-  FormClosing+=(s,e)=>{if(busy){e.Cancel=true;return;}if(!exit){e.Cancel=true;Hide();}};
-  Shown+=(s,e)=>{Place();name.Focus(); if(!Program.Smoke && string.IsNullOrEmpty(opt.Printer)) Configure();if(Program.Smoke)SmokeUi();};
+  FormClosing+=(s,e)=>{
+   bool shuttingDown=e.CloseReason==CloseReason.WindowsShutDown||e.CloseReason==CloseReason.TaskManagerClosing||e.CloseReason==CloseReason.ApplicationExitCall;
+   if(busy&&!shuttingDown){e.Cancel=true;return;}
+   SaveDraftSafe();
+   if(!exit&&!shuttingDown){e.Cancel=true;Hide();}
+  };
+  Shown+=(s,e)=>{Place();name.Focus(); if(!Program.Smoke && !Program.StartupSmoke && string.IsNullOrEmpty(opt.Printer)) Configure();if(Program.Smoke)SmokeUi();};
   UpdateInfo();UpdateAccount();
   if(pending!=null){name.Text=pending.Name;amount.Text=pending.Total.ToString("0.00",CultureInfo.InvariantCulture);if(!string.IsNullOrEmpty(pending.Capture)){using(var ms=new MemoryStream(Convert.FromBase64String(pending.Capture.Substring("data:image/png;base64,".Length))))using(var im=Image.FromStream(ms))capture=new Bitmap(im);capturePreview.Image=capture;capturePreview.Visible=true;name.Visible=false;}SetPendingMode();}
+  if(pending==null)RestoreDraft();
+  restoringDraft=false;
+  name.TextChanged+=(s,e)=>SaveDraftSafe();amount.TextChanged+=(s,e)=>SaveDraftSafe();
+  if(Program.StartupSmoke)SmokeStartup();
+ }
+ protected override void SetVisibleCore(bool value) {
+  if(firstVisibility&&value){firstVisibility=false;if(Program.StartHidden){value=false;if(!IsHandleCreated)CreateHandle();}}
+  base.SetVisibleCore(value);
+ }
+ string CaptureData() {
+  if(capture==null)return "";
+  if(captureData=="")using(var ms=new MemoryStream()){capture.Save(ms,System.Drawing.Imaging.ImageFormat.Png);captureData="data:image/png;base64,"+Convert.ToBase64String(ms.ToArray());}
+  return captureData;
+ }
+ void RestoreDraft() {
+  try {
+   var draft=PrivateFile.Load<WindowDraft>(draftFile);if(draft==null)return;
+   name.Text=draft.Name??"";amount.Text=draft.Amount??"";
+   if(!string.IsNullOrEmpty(draft.Capture)) {
+    const string prefix="data:image/png;base64,";
+    if(!draft.Capture.StartsWith(prefix))throw new Exception("Formato de captura inválido.");
+    using(var ms=new MemoryStream(Convert.FromBase64String(draft.Capture.Substring(prefix.Length))))using(var image=Image.FromStream(ms))capture=new Bitmap(image);
+    captureData=draft.Capture;capturePreview.Image=capture;capturePreview.Visible=true;name.Visible=false;
+   }
+   if(name.Text!=""||amount.Text!=""||capture!=null)status.Text="Datos recuperados • listos para continuar";
+  }catch(Exception ex){MessageBox.Show(this,"No se pudo recuperar el borrador. El archivo se conserva para revisión. "+ex.Message,"Recuperar datos",MessageBoxButtons.OK,MessageBoxIcon.Information);}
+ }
+ void SaveDraftSafe() {
+  if(restoringDraft||pending!=null)return;
+  try{PrivateFile.Save(draftFile,new WindowDraft{Name=name.Text,Amount=amount.Text,Capture=CaptureData()});}
+  catch(Exception ex){status.Text="No se pudo guardar el borrador: "+ex.Message;}
  }
  protected override bool ProcessCmdKey(ref Message msg,Keys keyData) {
   if(keyData==(Keys.Control|Keys.V) && !amount.ContainsFocus) {
@@ -90,11 +128,11 @@ class Emisor : Form {
     if((long)image.Width*image.Height>20000000)throw new Exception("La captura es muy grande. Captura solo la zona del nombre o número.");
     var next=GrayCapture(image); ClearCapture(); capture=next; capturePreview.Image=capture;
     name.Visible=false;capturePreview.Visible=true;capturePreview.Focus();
-    status.Text="Captura ajustada al cuadro • impresión en negro";
+    status.Text="Captura ajustada al cuadro • impresión en negro";SaveDraftSafe();
    }
   }catch(Exception ex){MessageBox.Show(this,ex.Message,"Pegar captura",MessageBoxButtons.OK,MessageBoxIcon.Information);}
  }
- void ClearCapture() {capturePreview.Image=null;if(capture!=null){capture.Dispose();capture=null;}capturePreview.Visible=false;name.Visible=true;}
+ void ClearCapture() {captureData="";capturePreview.Image=null;if(capture!=null){capture.Dispose();capture=null;}capturePreview.Visible=false;name.Visible=true;SaveDraftSafe();}
  internal static Bitmap GrayCapture(Image image) {
   var output=new Bitmap(image.Width,image.Height,System.Drawing.Imaging.PixelFormat.Format24bppRgb);
   using(var g=Graphics.FromImage(output))using(var a=new System.Drawing.Imaging.ImageAttributes()) {
@@ -153,7 +191,20 @@ class Emisor : Form {
    using(var bitmap=new Bitmap(Width,Height)){DrawToBitmap(bitmap,new Rectangle(0,0,Width,Height));bitmap.Save("interfaz-captura-prueba.png");}
    ClearCapture();name.Text="JUAN PÉREZ";if(!name.Visible||capturePreview.Visible||amount.Text!="25.00")throw new Exception("Text mode failed");
    using(var bitmap=new Bitmap(Width,Height)){DrawToBitmap(bitmap,new Rectangle(0,0,Width,Height));bitmap.Save("interfaz-texto-prueba.png");}
+   // Persist data for the next process to verify restart recovery.
+   name.Text="BORRADOR REINICIO";amount.Text="37,50";PasteCapture();SaveDraftSafe();
+   if(!File.Exists(draftFile))throw new Exception("Draft not saved");
    Clipboard.Clear();
+  }catch(Exception ex){Console.Error.WriteLine(ex);Environment.ExitCode=1;}finally{timer.Dispose();exit=true;Close();}};
+  timer.Start();
+ }
+ void SmokeStartup() {
+  var timer=new System.Windows.Forms.Timer{Interval=500};
+  timer.Tick+=(s,e)=>{timer.Stop();try{
+   if(Visible||!tray.Visible)throw new Exception("Startup must be hidden with tray icon visible");
+   if(name.Text!="BORRADOR REINICIO"||amount.Text!="37,50"||capture==null)throw new Exception("Draft did not survive process restart");
+   ShowPanel();if(!Visible)throw new Exception("Could not show window from startup");
+   ClearCapture();name.Clear();amount.Clear();SaveDraftSafe();
   }catch(Exception ex){Console.Error.WriteLine(ex);Environment.ExitCode=1;}finally{timer.Dispose();exit=true;Close();}};
   timer.Start();
  }
@@ -226,7 +277,13 @@ class Emisor : Form {
        doc.PrintPage+=(a,b)=>{DrawReceipt(b.Graphics,b.PageBounds.Width,b.PageBounds.Height,job.Name,job.Total,0,when,b.PageSettings.HardMarginX,b.PageSettings.HardMarginY,picture,job.Code);b.HasMorePages=false;};
        doc.Print();
        // Retain the same saved record for explicit reprints; never register it again.
-       if(!reprint){PrivateFile.Save(lastFile,job);last=job;File.Delete(pendingFile);pending=null;ClearCapture();name.Clear();amount.Clear();SetPendingMode();}
+       if(!reprint){
+        PrivateFile.Save(lastFile,job);last=job;
+        PrivateFile.Save(draftFile,new WindowDraft());
+        File.Delete(pendingFile);pending=null;
+        restoringDraft=true;try{ClearCapture();name.Clear();amount.Clear();}finally{restoringDraft=false;}
+        SetPendingMode();
+       }
        status.Text="QR "+job.Code+" registrado • enviado a la cola";name.Focus();
       }finally{if(picture!=null)picture.Dispose();}
      }
@@ -292,4 +349,6 @@ static class SelfTest {
   Console.WriteLine("OK: importes, texto, captura monocromática, JSON, 500 QR y recibo QR");
  }
 }
+
+
 
