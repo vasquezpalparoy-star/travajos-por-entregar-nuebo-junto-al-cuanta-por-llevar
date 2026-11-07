@@ -29,7 +29,8 @@ class TotalBadge:Label {
  protected override void OnPaint(PaintEventArgs e){e.Graphics.Clear(Parent==null?Theme.Paper:Parent.BackColor);var r=new Rectangle(1,2,Width-3,Height-5);Theme.Fill(e.Graphics,r,Color.FromArgb(216,248,197),Color.FromArgb(194,237,164),10);TextRenderer.DrawText(e.Graphics,Text,Font,new Rectangle(8,1,Width-16,Height-2),ForeColor,TextFormatFlags.VerticalCenter|TextFormatFlags.Right|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);}
 }
 class BlueTabs:TabControl {
- public BlueTabs(){DrawMode=TabDrawMode.OwnerDrawFixed;SizeMode=TabSizeMode.Fixed;ItemSize=new Size(128,30);Font=new Font("Segoe UI",12,FontStyle.Bold);Padding=new Point(10,4);}
+ public BlueTabs(){SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);DrawMode=TabDrawMode.OwnerDrawFixed;SizeMode=TabSizeMode.Fixed;ItemSize=new Size(128,30);Font=new Font("Segoe UI",12,FontStyle.Bold);Padding=new Point(10,4);}
+ protected override void OnPaint(PaintEventArgs e){e.Graphics.Clear(Theme.Paper);for(int i=0;i<TabCount;i++)OnDrawItem(new DrawItemEventArgs(e.Graphics,Font,GetTabRect(i),i,i==SelectedIndex?DrawItemState.Selected:DrawItemState.Default));}
  protected override void OnDrawItem(DrawItemEventArgs e){bool selected=e.Index==SelectedIndex;var r=GetTabRect(e.Index);r.Inflate(-1,0);Theme.Fill(e.Graphics,r,selected?Color.FromArgb(182,213,255):Color.FromArgb(243,245,250),selected?Color.FromArgb(151,194,252):Color.FromArgb(225,231,243),9);Theme.Border(e.Graphics,new Rectangle(r.X,r.Y,r.Width-1,r.Height-1),Color.FromArgb(174,193,225),9);TextRenderer.DrawText(e.Graphics,TabPages[e.Index].Text,Font,r,Theme.Ink,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis);}
 }
 class TitleBar:Panel {
