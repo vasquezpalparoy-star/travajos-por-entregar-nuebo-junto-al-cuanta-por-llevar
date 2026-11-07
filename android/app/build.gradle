@@ -3,7 +3,7 @@ android {
     namespace 'com.grafiplot.trabajosqr'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.grafiplot.trabajosqr.directo'
+        applicationId 'com.grafiplot.trabajosqr.deudas'
         minSdk 26
         targetSdk 35
         versionCode = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
