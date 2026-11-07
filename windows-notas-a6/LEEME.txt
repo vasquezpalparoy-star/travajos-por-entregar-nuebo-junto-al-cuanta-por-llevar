@@ -1,5 +1,9 @@
-GRAFIPLOT NOTAS A6 - Version 1.1 - Estilo moderno
+GRAFIPLOT NOTAS A6 - Version 1.2 - Compacto con estilo moderno
 Windows 10/11, 64 o 32 bits. Usa .NET Framework incluido en Windows 10.
+
+VENTANA COMPACTA
+Tamano base 520 x 520. Formatos A4, A1, A3, A0, A2 y Otros.
+Las etiquetas antiguas de copias se acortan conservando tus precios.
 
 ACTUALIZAR
 Cierra la version anterior desde clic derecho en su icono > Salir.

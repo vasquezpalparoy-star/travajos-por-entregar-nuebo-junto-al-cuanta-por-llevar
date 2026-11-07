@@ -15,7 +15,9 @@ public class PrintLine {
  public object Payload() { return new {name=Name,price=Price,quantities=Quantities,mode=Mode}; }
 }
 static class Calc {
- public static readonly string[] Formats={"Copias A4","Copias A1","Copias A3","Copias A0","Copias A2","Otros"};
+ public static readonly string[] Formats={"A4","A1","A3","A0","A2","Otros"};
+ public static string CompactName(string name){foreach(string format in Formats)if(name=="Copias "+format)return format;return name;}
+ public static void CompactNames(Book b){foreach(var rate in b.Rates)rate.Name=CompactName(rate.Name);foreach(var note in b.Notes)foreach(var row in note.Rows)row.Name=CompactName(row.Name);}
  public static decimal Money(string s) {
   s=(s??"").Trim(); if(!Regex.IsMatch(s,@"^\d{1,7}([.,]\d{1,2})?$"))throw new Exception("Usa soles con hasta 2 decimales, sin separador de miles.");
   return decimal.Parse(s.Replace(',','.'),CultureInfo.InvariantCulture);
