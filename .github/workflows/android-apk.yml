@@ -36,22 +36,22 @@ jobs:
         working-directory: android
         run: gradle assembleDebug lintDebug --no-daemon
       - name: Preparar APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk GRAFIPLOT_QR_Deudas.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk GRAFIPLOT_QR_Deudas_1_6.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: GRAFIPLOT_QR_Deudas
+          name: GRAFIPLOT_QR_Deudas_1_6
           overwrite: true
-          path: GRAFIPLOT_QR_Deudas.apk
+          path: GRAFIPLOT_QR_Deudas_1_6.apk
       - name: Publicar instalador
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          release_tag="apk-deudas-1.5-${GITHUB_RUN_NUMBER}"
+          release_tag="apk-deudas-1.6-${GITHUB_RUN_NUMBER}"
           for publish_attempt in 1 2 3; do
             if ! gh release view "$release_tag" >/dev/null 2>&1; then
-              gh release create "$release_tag" --target "$GITHUB_SHA" --title "GRAFIPLOT QR Deudas 1.5" --notes "Instalación independiente de QR Directo para evitar conflictos de firma. Desde la ficha QR: eliminar deuda marcándola pagada y editar total, pago o saldo. Sincronización con PC y actualización de notificaciones. Conserva cámara delantera/trasera, flash, recibos PDF y modo de segundo plano." || true
+              gh release create "$release_tag" --target "$GITHUB_SHA" --title "GRAFIPLOT QR Deudas 1.6" --notes "Instalación independiente de QR Directo para evitar conflictos de firma. Acciones diferenciadas: Marcar pagado deja deuda cero. Pagado y retirar de pendientes marca recogido, conserva historial y libera QR. Desde la ficha QR: eliminar deuda marcándola pagada y editar total, pago o saldo. Sincronización con PC y actualización de notificaciones. Conserva cámara delantera/trasera, flash, recibos PDF y modo de segundo plano." || true
             fi
-            if gh release upload "$release_tag" GRAFIPLOT_QR_Deudas.apk --clobber; then
+            if gh release upload "$release_tag" GRAFIPLOT_QR_Deudas_1_6.apk --clobber; then
               exit 0
             fi
             sleep 5

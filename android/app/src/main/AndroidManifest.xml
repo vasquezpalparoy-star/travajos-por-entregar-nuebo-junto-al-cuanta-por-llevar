@@ -6,7 +6,7 @@
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA"/>
 <uses-feature android:name="android.hardware.camera" android:required="true"/>
-<application android:label="GRAFIPLOT QR Deudas" android:icon="@drawable/ic_launcher" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:usesCleartextTraffic="false" android:allowBackup="false">
+<application android:label="GRAFIPLOT QR Deudas 1.6" android:icon="@drawable/ic_launcher" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:usesCleartextTraffic="false" android:allowBackup="false">
 <service android:name=".QrCameraService" android:exported="false" android:foregroundServiceType="camera"/>
 <activity android:name=".MainActivity" android:launchMode="singleTop" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden">
 <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
